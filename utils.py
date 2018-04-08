@@ -23,3 +23,77 @@ def creat_dir(network_type):
         if not os.path.exists(path):
             os.makedirs(path)
     return log_dir, model_dir
+
+
+
+
+def church_plt(pred_res, axis_range, fn=None):
+    fn = 'church_plot_s{}_g{}.png'.format(cfg['range'], cfg['gpu_idx'])
+    from pylab import *
+    import matplotlib.gridspec as gridspec
+    import numpy as np
+    import matplotlib.pylab as pylab
+
+    params = {'legend.fontsize': 'x-large',
+              'figure.figsize': (14, 5),
+              'axes.labelsize': 'x-large',
+              'axes.titlesize': 'x-large',
+              'xtick.labelsize': 'x-large',
+              'ytick.labelsize': 'x-large'}
+    pylab.rcParams.update(params)
+
+    axis_range = [-32, 32, -32, 32]
+    aa = pred_res
+    x_ticks_var = ['{}'.format(axis_range[0]), '0', '{}'.format(axis_range[1])]
+    y_ticks_var = ['{}'.format(axis_range[2]), '0', '{}'.format(axis_range[3])]
+    mat_size = 192
+    x_ticks_loc = [0, mat_size / 2, mat_size]
+    y_ticks_loc = [0, mat_size / 2, mat_size]
+
+    fig, axes = plt.subplots(nrows=1, ncols=2)
+    cmap = plt.get_cmap('jet', 10)
+
+    ax = axes[0]
+    pred_matrix = aa['lenet']
+    im = ax.imshow(pred_matrix, cmap=cmap, vmin=0, vmax=9)
+    ax.set_title('lenet')
+    plt.sca(ax)
+    plt.xticks(x_ticks_loc, x_ticks_var, color='black')
+    plt.yticks(y_ticks_loc, y_ticks_var, color='black')
+    # Minor ticks
+    ax.set_xticks([mat_size / 2], minor=True)
+    ax.set_yticks([mat_size / 2], minor=True)
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='w', linestyle='-', linewidth=0.7)
+
+    ax = axes[1]
+    pred_matrix = aa['binarize']
+    im = ax.imshow(pred_matrix, cmap=cmap, vmin=0, vmax=9)
+    ax.set_title('binarize')
+    plt.sca(ax)
+    plt.xticks(x_ticks_loc, x_ticks_var, color='black')
+    plt.yticks(y_ticks_loc, y_ticks_var, color='black')
+    # Minor ticks
+    ax.set_xticks([mat_size / 2], minor=True)
+    ax.set_yticks([mat_size / 2], minor=True)
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='w', linestyle='-', linewidth=0.7)
+
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.9, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    plt.show()
+
+    plt.savefig(fn)
+
+
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# plt.semilogy(test_loss_hist)
+# plt.show()
+#
+# # plt.imshow(sess.run(jacobi_result['u_hist'][-1], feed_dict_train)[0,:,:,0], cmap="hot")
+# plt.imshow(y_input[0,:,:,0], cmap="hot")
+# plt.colorbar()
+# plt.show()

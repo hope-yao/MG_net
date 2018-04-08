@@ -31,6 +31,7 @@ class FMG():
         for depth_i in range(self.max_depth):
             result_i = self.vmg_stack['depth_{}'.format(depth_i)].apply(f,u)
             result['depth_{}'.format(depth_i)] = u = result_i['final']
+        result['final'] = u
         return result
 
 if __name__ == '__main__':
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     fmg_result = fmg.apply(f,u)
 
     # optimizer
-    u_hat = fmg_result['layer_{}'.format(cfg['max_depth']-1)]
+    u_hat = fmg_result['final']
     loss = tf.reduce_mean(tf.abs(u_hat - u ))
     lr = 0.01
     learning_rate = tf.Variable(lr) # learning rate for optimizer
