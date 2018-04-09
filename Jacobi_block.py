@@ -32,12 +32,17 @@ def Jacobi_solver_fem():
     print('done')
 
 def conv_vs_axpy():
+    data = sio.loadmat('./data/heat_transfer/Heat_Transfer.mat')
+    ftest = np.zeros((66,68),dtype='float32')
+    ftest[1:65,2:66] = data['u']
+
+
     # axpy
     data = sio.loadmat('/home/hope-yao/Downloads/matrix.mat')
     A1 = data['matrix'][0][0][0]
     f1 = data['matrix'][0][0][1]
     u1 = np.linalg.solve(A1, f1)
-    b=np.matmul(A1,np.ones_like(f1))
+    b=np.matmul(A1,ftest.reshape(66*68,1))#np.ones_like(f1))
     bb = b.reshape(66, 68)
     plt.figure()
     plt.imshow(bb)
@@ -58,13 +63,14 @@ def conv_vs_axpy():
     w_filter = np.asarray([[1., 1., 1.], [1., -8., 1.], [1., 1., 1.]],'float32') * A_weights['k'] / 3.
     w_filter = tf.constant(w_filter.reshape((3,3,1,1)))
     u = np.ones((1,68,68,1),'float32')
-    u[0,:,0,0] = 0
-    u[0,:,-1,0] = 0
+    u[0,1:-1,:,0] = ftest.reshape(66,68)
+    u[0,0,:,0] = 0
+    u[0,-1,:,0] = 0
     u = tf.constant(u)
     output = tf.nn.conv2d(input=u, filter=w_filter, strides=[1,1,1,1], padding='SAME')
     img = sess.run(output)
     plt.figure()
-    plt.imshow(img[0, :, 1:-1, 0])
+    plt.imshow(img[0,1:-1, :,  0])
     plt.colorbar()
     plt.show()
     print('done')
