@@ -135,16 +135,16 @@ if __name__ == '__main__':
         'batch_size': 16,
         'imsize': 64,
         'physics_problem': 'heat_transfer',  # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
-        'max_depth': 0, # depth of V cycle, degrade to Jacobi if set to 0
+        'max_depth': 1, # depth of V cycle, degrade to Jacobi if set to 0
     }
 
     f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
     u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
-    # vmg = VMG_geometric(cfg, jacobi)
-    # vmg_result = vmg.apply(f,u)
+    vmg = VMG_geometric(cfg, jacobi)
+    vmg_result = vmg.apply(f,u)
 
-    vmg_result = jacobi.apply(f, u)
+    # vmg_result = jacobi.apply(f, u)
 
 
     # optimizer
