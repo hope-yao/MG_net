@@ -90,8 +90,8 @@ def Jacobi_solver_conv():
     f1 = data['matrix'][0][0][1]
     A1 = data['matrix'][0][0][0]
     u1 = np.linalg.solve(A1, f1)
-    u_gt = np.zeros((1,68,68,1))
-    u_gt[0,1:-1,:,0] = u1.reshape(66,68)
+    u_gt = u1.reshape(1,66,68,1)
+    f1 = f1.reshape(1,66,68,1)
 
     FLAGS = tf.app.flags.FLAGS
     tfconfig = tf.ConfigProto(
@@ -103,30 +103,24 @@ def Jacobi_solver_conv():
     init = tf.global_variables_initializer()
     sess.run(init)
 
-    max_itr = 1000
-    itr = 0
     result = {}
-    u_input = np.zeros((1, 68, 68, 1), 'float32')
-    result['u_hist'] = [u_input]
-    result['res_hist'] = [np.mean(np.abs(u_input-u_gt))]
-    for itr in range(max_itr):
+    u_input = np.zeros((1, 68, 68, 1), 'float32')  # where u is unknown
+    for itr in range(1000):
         padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-        LU_u = tf.nn.conv2d(input=padded_input, filter=A_weights['LU_filter'], strides=[1,1,1,1], padding='VALID')
-        u = sess.run((f1.reshape(1,66,68,1) - LU_u[:,1:-1,:,:])  / A_weights['D_matrix'])
-        u_input = np.zeros((1, 68, 68, 1), 'float32')
-        u_input[:, 1:-1, :, :] = u
-        result['u_hist'] += [u_input]
-        result['res_hist'] += [np.mean(np.abs(u_input-u_gt))]
+        LU_u = tf.nn.conv2d(input=padded_input, filter=A_weights['LU_filter'], strides=[1, 1, 1, 1], padding='VALID')
+        u = (f1 - LU_u[:, 1:-1, :]) / A_weights['D_matrix']
+        u_input = tf.pad(u, tf.constant([[0, 0], [1, 1], [0, 0], [0, 0]]), "CONSTANT")
+    result['final'] = sess.run(u)[0,:,:,0]
+
     plt.figure()
     plt.imshow(u_gt[0,:,:,0],cmap='hot')
     plt.grid('off')
     plt.colorbar()
     plt.figure()
-    plt.imshow(result['u_hist'][-1][0,1:-1,:,0],cmap='hot')
+    plt.imshow(result['final'],cmap='hot')
     plt.grid('off')
     plt.colorbar()
     plt.show()
-    result['final'] = result['u_hist'][-1]
     return result
 
 
