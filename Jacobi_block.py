@@ -23,7 +23,7 @@ class Jacobi_block():
             # self.A_weights['D_matrix'] = tf.Variable(np.ones((1, self.imsize, self.imsize, 1)), dtype=tf.float32, name='D_matrix')
 
             # NOTICE: right now for homogeneous anisotropic material only!!
-            self.k = tf.Variable(1., tf.float32)
+            self.k = tf.Variable(16., tf.float32)
             lu_filter = 1/3. * np.asarray([[1., 1., 1.], [1., 0., 1.], [1., 1., 1.]])
             self.A_weights['LU_filter'] = np.reshape(lu_filter,(3,3,1,1)) * self.k
             lu_bias = np.zeros((self.batch_size, self.imsize, self.imsize, self.response_dim))
@@ -39,7 +39,7 @@ class Jacobi_block():
         result = {}
         u_input = np.zeros((1, 68, 68, 1), 'float32')  # where u is unknown
         result['u_hist'] = [u_input]
-        for itr in range(400):
+        for itr in range(1500):
             padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
             LU_u = tf.nn.conv2d(input=padded_input, filter=self.A_weights['LU_filter'], strides=[1, 1, 1, 1],padding='VALID')
             u = (f - LU_u[:, 1:-1, :]) / self.A_weights['D_matrix']

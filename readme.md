@@ -1,23 +1,17 @@
-Todo:
-1. Capable to solve FEM problems without training given known eq? Test with known para_k
-2. how to handle boundary condition
+
+1. convolution with special boundary treatment is equvlent
+![u_gt](./data/heat_transfer/ground_truth_u.png)
+![u_conv](./data/heat_transfer/jacobi_wx_it612.png)
 
 
-observation for Jacobi(10):
-1. Jacobi network will have very slow convergence at high resolution
-2. Jacobi network with low resolution 8x8 can converge to ~6% training error but no more. And works under SGD, not Adadelta
-3. Jacobi network with even lower resolution 4x4 can converge to <0.5% training error with SGD.lr=0.1 very fast
-4. Jacobi network 4X4, training error<0.05%  with Adam.lr=0.01, <20epoch
-5. Jacobi network 4X4, training error<0.01%  with Adam.lr=0.001, <10epoch
-6. Jacobi network 4X4, training error<1e-5  with Adam.lr=0.0001, <20epoch
-7. Jacobi network 4X4, converging slow again.  with Adam.lr=0.00001,
+2. feed forward Jacobi network is converging, but slow
+![Jacobi_forward_convergence](./data/heat_transfer/jacobi_wx_convergence.png)
 
-based on (6) above, use SGD.lr=0.0001 to train resolution 8x8 for Jacobi(10):
-1. Jacobi network 8X8, training error<1e-5  with Adam.lr=0.0001, <20epoch
-2. Jacobi network 16X16, training error<1e-5  with Adam.lr=0.0001, ~120epoch
-3. Jacobi network 32x32, training error<1e-5  with Adam.lr=0.0001, ~130epoch
-4. Jacobi network 64x64, training error<1e-5  with Adam.lr=0.0001, ~135epoch
+3. parameter estimation requires very deep network
+ground truth -> 16.0
+400 layers -> 8.1
+1500 layers -> 14.3
+This is caused by the error in network prediction/ slow convergence v.s. network depth
 
 
-3. the parameter k can't be successfully estimated in all cases.
-4. in some cases, half of the predicted image has very small pixel value. Don't know why yet.
+
