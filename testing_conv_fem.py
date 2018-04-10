@@ -90,8 +90,8 @@ def Jacobi_solver_conv():
     f1 = data['matrix'][0][0][1]
     A1 = data['matrix'][0][0][0]
     u1 = np.linalg.solve(A1, f1)
-    u_gt = np.zeros((68,68))
-    u_gt[1:-1,:] = u1.reshape(66,68)
+    u_gt = np.zeros((1,68,68,1))
+    u_gt[0,1:-1,:,0] = u1.reshape(66,68)
 
     FLAGS = tf.app.flags.FLAGS
     tfconfig = tf.ConfigProto(
@@ -110,7 +110,8 @@ def Jacobi_solver_conv():
     result['u_hist'] = [u_input]
     result['res_hist'] = [np.mean(np.abs(u_input-u_gt))]
     for itr in range(max_itr):
-        LU_u = tf.nn.conv2d(input=tf.constant(u_input,dtype='float32'), filter=A_weights['LU_filter'], strides=[1,1,1,1], padding='SAME')
+        padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+        LU_u = tf.nn.conv2d(input=padded_input, filter=A_weights['LU_filter'], strides=[1,1,1,1], padding='VALID')
         u = sess.run((f1.reshape(1,66,68,1) - LU_u[:,1:-1,:,:])  / A_weights['D_matrix'])
         u_input = np.zeros((1, 68, 68, 1), 'float32')
         u_input[:, 1:-1, :, :] = u

@@ -33,8 +33,7 @@ class Jacobi_block():
             assert 'not supported'
 
     def LU_layers(self, input_tensor, LU_filter, LU_bias):
-        return tf.nn.conv2d(input=input_tensor, filter=LU_filter, strides=[1,1,1,1], padding='SAME')
-        # return tf.nn.elu(tf.nn.conv2d(input=input_tensor, filter=LU_filter, strides=[1,1,1,1], padding='SAME') + LU_bias)
+        return tf.nn.conv2d(input=input_tensor, filter=LU_filter, strides=[1,1,1,1], padding='VALID')
 
     def apply(self, f, u, max_itr=10):
         itr = 0
@@ -49,7 +48,19 @@ class Jacobi_block():
         result['final'] = u_new
         return result
 
-
+        result = {}
+        u_input = np.zeros((1, 68, 68, 1), 'float32')
+        result['u_hist'] = [u_input]
+        result['res_hist'] = [np.mean(np.abs(u_input - u_gt))]
+        while itr<max_itr:
+            padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC") # boundary padding!!
+            LU_u = self.LU_layers(padded_input, self.A_weights['LU_filter'], self.A_weights['LU_bias'])
+            u = (f1.reshape(1,66,68,1) - LU_u[:,1:-1,:,:])  / A_weights['D_matrix']
+            u_input = np.zeros((1, 68, 68, 1), 'float32')
+            u_input[:, 1:-1, :, :] = u
+            result['u_hist'] += [u_input]
+            result['res_hist'] += [np.mean(np.abs(u_input-u_gt))]
+        return result
 
 if __name__ == "__main__":
     from utils import creat_dir
