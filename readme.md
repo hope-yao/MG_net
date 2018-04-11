@@ -11,6 +11,7 @@
 ground truth -> 16.0
 400 layers -> 8.1
 1500 layers -> 14.3
+2000 layers -> 15.0
 This is caused by the error in network prediction/ slow convergence v.s. network depth
 
 

@@ -28,23 +28,24 @@ class Jacobi_block():
             self.A_weights['LU_filter'] = np.reshape(lu_filter,(3,3,1,1)) * self.k
             lu_bias = np.zeros((self.batch_size, self.imsize, self.imsize, self.response_dim))
             self.A_weights['LU_bias'] = tf.Variable(lu_bias, dtype=tf.float32)
-            self.A_weights['D_matrix'] = tf.tile(tf.reshape(-8./3.*self.k,(1,1,1,1)),(1,66,68,1))
+            self.A_weights['D_matrix'] = -8./3.*self.k #tf.tile(tf.reshape(-8./3.*self.k,(1,1,1,1)),(1,self.imsize-2,self.imsize,1))
         else:
             assert 'not supported'
 
-    def LU_layers(self, input_tensor, LU_filter, LU_bias):
-        return tf.nn.conv2d(input=input_tensor, filter=LU_filter, strides=[1,1,1,1], padding='VALID')
+    def LU_layers(self, input_tensor):
+        padded_input = tf.pad(input_tensor, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+        LU_u = tf.nn.conv2d(input=padded_input, filter=self.A_weights['LU_filter'], strides=[1, 1, 1, 1],padding='VALID')
+        return LU_u
 
     def apply(self, f, max_itr=10):
         result = {}
-        u_input = np.zeros((1, 68, 68, 1), 'float32')  # where u is unknown
-        result['u_hist'] = [u_input]
-        for itr in range(1500):
-            padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-            LU_u = tf.nn.conv2d(input=padded_input, filter=self.A_weights['LU_filter'], strides=[1, 1, 1, 1],padding='VALID')
+        u = tf.zeros_like(f) # where u is unknown
+        result['u_hist'] = [u]
+        for itr in range(max_itr):
+            u_input = tf.pad(u, tf.constant([[0, 0], [1, 1], [0, 0], [0, 0]]), "CONSTANT") # boundary condition
+            LU_u = self.LU_layers(u_input)
             u = (f - LU_u[:, 1:-1, :]) / self.A_weights['D_matrix']
             result['u_hist'] += [u]
-            u_input = tf.pad(u, tf.constant([[0, 0], [1, 1], [0, 0], [0, 0]]), "CONSTANT")
         result['final'] = u
         return result
 
@@ -54,11 +55,11 @@ if __name__ == "__main__":
 
     cfg = {
             'batch_size': 1,
-            'imsize': 64,
+            'imsize': 68,
             'physics_problem': 'heat_transfer', # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
            }
-    f = tf.placeholder(tf.float32,shape=(cfg['batch_size'], 66, 68, 1))
-    u = tf.placeholder(tf.float32,shape=(cfg['batch_size'], 66, 68, 1))
+    f = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
+    u = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
     jacobi_result = jacobi.apply(f, max_itr=100)
 
@@ -85,8 +86,8 @@ if __name__ == "__main__":
     f1 = data['matrix'][0][0][1]
     A1 = data['matrix'][0][0][0]
     u1 = np.linalg.solve(A1, f1)
-    u_gt = u1.reshape(1,66,68,1)
-    f1 = f1.reshape(1,66,68,1)
+    u_gt = u1.reshape(1,cfg['imsize']-2,cfg['imsize'],1)
+    f1 = f1.reshape(1,cfg['imsize']-2,cfg['imsize'],1)
 
     batch_size = cfg['batch_size']
     test_loss_hist = []
