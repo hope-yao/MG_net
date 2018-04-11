@@ -37,9 +37,8 @@ class Jacobi_block():
         LU_u = tf.nn.conv2d(input=padded_input, filter=self.A_weights['LU_filter'], strides=[1, 1, 1, 1],padding='VALID')
         return LU_u
 
-    def apply(self, f, max_itr=10):
+    def apply(self, f, u, max_itr=10):
         result = {}
-        u = tf.zeros_like(f) # where u is unknown
         result['u_hist'] = [u]
         for itr in range(max_itr):
             u_input = tf.pad(u, tf.constant([[0, 0], [1, 1], [0, 0], [0, 0]]), "CONSTANT") # boundary condition
@@ -61,7 +60,8 @@ if __name__ == "__main__":
     f = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     u = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
-    jacobi_result = jacobi.apply(f, max_itr=100)
+    u = tf.zeros_like(f)  # where u is unknown
+    jacobi_result = jacobi.apply(f, u, max_itr=100)
 
     # optimizer
     jacobi_result['loss'] = loss = tf.reduce_mean(tf.abs(jacobi_result['final'] - u ))
