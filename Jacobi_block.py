@@ -7,8 +7,6 @@ import seaborn as sns
 import scipy.io as sio
 import numpy as np
 
-
-
 class Jacobi_block():
     def __init__(self,cfg):
         self.imsize = cfg['imsize']
@@ -56,12 +54,13 @@ if __name__ == "__main__":
             'batch_size': 1,
             'imsize': 68,
             'physics_problem': 'heat_transfer', # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
-           }
+            'alpha': 1500,  # iteration
+          }
     f = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     u = tf.placeholder(tf.float32,shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
     u = tf.zeros_like(f)  # where u is unknown
-    jacobi_result = jacobi.apply(f, u, max_itr=100)
+    jacobi_result = jacobi.apply(f, u, max_itr=cfg['alpha'])
 
     # optimizer
     jacobi_result['loss'] = loss = tf.reduce_mean(tf.abs(jacobi_result['final'] - u ))

@@ -8,30 +8,76 @@ import scipy.io as sio
 import numpy as np
 
 
-def Jacobi_solver_fem():
-    data = sio.loadmat('/home/hope-yao/Downloads/matrix.mat')
-    A1 = data['matrix'][0][0][0]
-    f1 = data['matrix'][0][0][1]
-    u1 = np.linalg.solve(A1, f1)
+def Jacobi_solver_ax(A1, f1, u):
+    # data = sio.loadmat('/home/hope-yao/Downloads/matrix.mat')
+    # A1 = data['matrix'][0][0][0]
+    # f1 = data['matrix'][0][0][1]
+    # u1 = np.linalg.solve(A1, f1)
 
     D = A1.diagonal()
     D_inv = np.diag(1. / np.asarray(D))
     LU = A1 - np.diag(D)
-    a, b = np.linalg.eig(np.matmul(D_inv, LU))
+    # a, b = np.linalg.eig(np.matmul(D_inv, LU))
 
-    u = np.zeros_like(f1)
+    # u = np.zeros_like(f1)
     u_hist = [u]
-    er_hist = [np.mean(np.abs(u_hist[-1] - u1))]
+    er_hist = [np.mean(np.abs(u_hist[-1] - u))]
     for i in range(200):
         u = np.matmul(D_inv, (f1 - np.matmul(LU, u)))
         u_hist += [u]
-        er_hist += [np.mean(np.abs(u_hist[-1] - u1))]
+        er_hist += [np.matmul(A1,u_hist[-1]) - f1]
 
-    plt.plot(er_hist)
-    plt.show()
-    print('done')
+    # plt.plot(er_hist)
+    # plt.show()
+    return u_hist[-1], er_hist[-1]
 
-def conv_vs_axpy():
+
+def VMG_solver_ax():
+    data = sio.loadmat('/home/hope-yao/Downloads/matrix.mat')
+    A1 = data['matrix'][0][0][0]
+    f1 = data['matrix'][0][0][1]
+    max_depth = 2
+    f_level = {}
+    f_i = f1.reshape(66,68)
+    f_level['1h'] = f_i
+    for layer_i in range(1, max_depth, 1):
+        f_i = np.asarray([np.mean(f_i[2*i:2*(i+1),2*j:2*(j+1)]) for i in range(33) for j in range(34)]).reshape(33,34)
+        f_level['{}h'.format(2 ** layer_i)] = f_i.flatten()
+
+    # fine to coarse h, 2h, 4h, 8h, ...
+    f_cur = f1
+    u_level = []
+    for layer_i in range(1, max_depth+1, 1):
+        u_cur = f_cur
+        u_h, r_h = Jacobi_solver_ax(A1, f_cur.flatten(), u_cur.flatten())
+        r_h = r_h.reshape(66, 68)
+        u_level += [u_h]
+        # downsample residual to next level input
+        r_h_down = np.asarray([np.mean(r_h[2*i:2*(i+1),2*j:2*(j+1)]) for i in range(33) for j in range(34)]).reshape(33,34)
+        f_cur = r_h_down
+
+    # bottom level, lowest frequency part
+    e_bottom = Jacobi_solver_ax(A1, f_cur.flatten(), f_cur.flatten())
+
+    u_pred = []
+    layer_i = 1
+    # coarse to fine: ..., 8h, 4h, 2h, h
+    cur_level_sol = e_bottom
+    u_pred += [cur_level_sol]
+    while layer_i < max_depth:  # 4h, 2h, h
+        upper_level_sol = u_level[-layer_i]
+        import scipy.ndimage as ndimage
+        upsampled_cur_level_sol = ndimage.zoom(e_bottom.reshape(33, 34), 2, order=0)
+        cur_level_sol = upper_level_sol + upsampled_cur_level_sol
+        cur_level_sol_correct = Jacobi_solver_ax(A1, cur_level_sol.flatten(), cur_level_sol.flatten())
+        u_level += [cur_level_sol_correct + u_level[0]]
+        layer_i += 1
+    u_pred['final'] = u_pred['1h']
+
+    return u_pred
+
+
+def ax_vs_wx():
     data = sio.loadmat('./data/heat_transfer/Heat_Transfer.mat')
     ftest = np.zeros((66,68),dtype='float32')
     ftest[1:65,2:66] = data['u']
@@ -77,7 +123,7 @@ def conv_vs_axpy():
     plt.show()
     print('error: {}'.format(np.mean(np.abs(bb-img[0,1:-1, :,  0]))))
 
-def Jacobi_solver_conv():
+def Jacobi_solver_wx():
 
     A_weights = {}
     A_weights['k'] = 16.
@@ -124,6 +170,7 @@ def Jacobi_solver_conv():
     return result
 
 
-# Jacobi_solver_fem()
-# conv_vs_axpy()
-Jacobi_solver_conv()
+# Jacobi_solver_ax()
+# ax_vs_wx()
+# Jacobi_solver_wx()
+VMG_solver_ax()

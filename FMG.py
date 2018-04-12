@@ -38,12 +38,13 @@ class FMG():
             f_level['{}h'.format(2**depth_i)] = f = tf.nn.avg_pool(f, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
             u_level['{}h'.format(2**depth_i)] = u =tf.nn.avg_pool(u, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
 
+        # run several VMG of different depth
         u_level_i = u_level['{}h'.format(2**(self.max_depth-1))]
         for depth_i in range(1, self.max_depth+1, 1):
             vmg_level_i = self.vmg_stack['depth_{}'.format(depth_i)]
             f_level_i = f_level['{}h'.format(2**(self.max_depth-depth_i))]
-            result_level_i = vmg_level_i.apply(f_level_i, u_level_i)
-            result['depth_{}'.format(depth_i)] = u_level_i = result_level_i['final']
+            result_level_i, _, _ = vmg_level_i.apply(f_level_i, u_level_i)
+            result['depth_{}'.format(depth_i)] = u_level_i = result_level_i
             if depth_i<self.max_depth:
                 upper_level_sol_dim = u_level['{}h'.format(2**(self.max_depth-depth_i-1))].get_shape().as_list()[1:3]
                 u_level_i = tf.image.resize_images(u_level_i, size=upper_level_sol_dim,method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)

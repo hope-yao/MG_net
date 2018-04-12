@@ -7,12 +7,24 @@
 2. feed forward Jacobi network is converging, but slow
 ![Jacobi_forward_convergence](./data/heat_transfer/jacobi_wx_convergence.png)
 
-3. parameter estimation requires very deep network
+3. parameter estimation requires very deep network:
+
 ground truth -> 16.0
+
 400 layers -> 8.1
+
 1500 layers -> 14.3
+
 2000 layers -> 15.0
+
 This is caused by the error in network prediction/ slow convergence v.s. network depth
 
+4. VMG accuracy:
 
+2 level (50,20), 11.68%
 
+3 level (50,20), 10.97%
+
+4 level (50,20), 10.64%
+
+4 level (50,20), 10.61%

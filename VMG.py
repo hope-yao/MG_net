@@ -79,7 +79,7 @@ class VMG_geometric():
         self.imsize = cfg['imsize']
 
     def Ax_net(self, input_tensor, jacobi):
-        D_mat = -8. * self.jacobi.k
+        D_mat = -8./3. * self.jacobi.k
         LU_u = jacobi.LU_layers(input_tensor)
         return D_mat * input_tensor + LU_u
 
@@ -96,38 +96,46 @@ class VMG_geometric():
         f_i = f
         f_level['1h'] = f
         for layer_i in range(1, self.max_depth, 1):
-            f_level['{}h'.format(2**layer_i)] = f_i = tf.nn.avg_pool(f_i, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            # times 4 because surface force needs integration to become nodal force!
+            f_level['{}h'.format(2**layer_i)] = f_i = 4.*tf.nn.avg_pool(f_i, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
 
         u_h = {}
         r_h = {}
+        cur_u = u # inital guess
         cur_f = f
         # fine to coarse h, 2h, 4h, 8h, ...
         for layer_i in range(1,self.max_depth,1):
-            mg_result = self.apply_MG_block(cur_f, cur_f, self.alpha_1)
+            mg_result = self.apply_MG_block(cur_f, cur_u, self.alpha_1)
             u_h['{}h'.format(2**(layer_i-1))] = mg_result['u']
             r_h['{}h'.format(2**(layer_i-1))] = mg_result['res']
             # downsample residual to next level input
-            cur_f = tf.nn.avg_pool(mg_result['res'], ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            cur_f = 4.*tf.nn.avg_pool(mg_result['res'], ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            cur_u = tf.zeros_like(cur_f) # inital 0 for residual
 
         # bottom level, lowest frequency part
-        e_bottom = self.jacobi.apply(cur_f, cur_f, max_itr=self.alpha_2)
+        e_bottom = self.jacobi.apply(cur_f, cur_u, max_itr=self.alpha_2)
         u_h['{}h'.format(2 ** (self.max_depth - 1))] = e_bottom['final']
 
-        u_pred = {}
+        u_correct = {}
         layer_i = 1
         # coarse to fine: ..., 8h, 4h, 2h, h
-        u_pred['{}h'.format(2**(self.max_depth-1))] = cur_level_sol = u_h['{}h'.format(2**(self.max_depth-1))]
+        u_correct['{}h'.format(2**(self.max_depth-1))] = cur_level_sol = u_h['{}h'.format(2**(self.max_depth-1))]
         while layer_i<self.max_depth: # 4h, 2h, h
             upper_level_sol = u_h['{}h'.format(2 ** (self.max_depth-layer_i-1))]
             upper_level_sol_dim = upper_level_sol.get_shape().as_list()[1:3]
-            upsampled_cur_level_sol = tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            upsampled_cur_level_sol = 1/4.*tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            # divided by 4 because surface force needs integration to become nodal force!
             cur_level_sol = upper_level_sol + upsampled_cur_level_sol
-            cur_level_sol_correct = self.jacobi.apply(f_level['{}h'.format(2**(self.max_depth-layer_i-1))], cur_level_sol, self.alpha_1)
-            u_pred['{}h'.format(2**(self.max_depth-layer_i-1))] = cur_level_sol_correct['final']
+            cur_level_f = f_level['{}h'.format(2 ** (self.max_depth - layer_i - 1))]
+            cur_level_sol_correct = self.jacobi.apply(cur_level_f, cur_level_sol, self.alpha_1)
+            u_correct['{}h'.format(2**(self.max_depth-layer_i-1))] = cur_level_sol_correct['final']
             layer_i += 1
-        u_pred['final'] = u_pred['1h']
+        if self.max_depth>1:
+            u_pred = u_correct['1h']
+        else:
+            u_pred = u_h['1h']
 
-        return u_pred
+        return u_pred, u_h, u_correct
 
 if __name__ == '__main__':
     from tqdm import tqdm
@@ -136,19 +144,22 @@ if __name__ == '__main__':
         'batch_size': 16,
         'imsize': 68,
         'physics_problem': 'heat_transfer',  # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
-        'max_depth': 3, # depth of V cycle, degrade to Jacobi if set to 0
-        'alpha1': 10, # iteration at high frequency
-        'alpha2': 100, # iteration at low freqeuncy
+        'max_depth': 4, # depth of V cycle, degrade to Jacobi if set to 0
+        'alpha1': 50, # iteration at high frequency
+        'alpha2': 50, # iteration at low freqeuncy
     }
 
     f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
     vmg = VMG_geometric(cfg, jacobi)
-    vmg_result = vmg.apply(f, f) #second f is inital guess for u
+    u_initial = f
+    vmg_result, vmg_u_h, vmg_u_correct = vmg.apply(f, u_initial) #second f is inital guess for u
+    jacobi_result = jacobi.apply(f, u_initial, max_itr=cfg['alpha2'])
+
 
     # optimizer
-    loss = tf.reduce_mean(tf.abs(vmg_result['final'] - u ))
+    loss = tf.reduce_mean(tf.abs(vmg_result - u ))
     ## training starts ###
     FLAGS = tf.app.flags.FLAGS
     tfconfig = tf.ConfigProto(
@@ -170,7 +181,7 @@ if __name__ == '__main__':
     u_input = np.tile(u_gt, (16, 1, 1, 1))
     f_input = np.tile(f1, (16, 1, 1, 1))
     feed_dict_train = {f: f_input, u: u_input}
-    loss_value, u_value = sess.run([loss, vmg_result['final']], feed_dict_train)
+    loss_value, u_value = sess.run([loss, vmg_result], feed_dict_train)
 
     import matplotlib.pyplot as plt
 
@@ -178,3 +189,4 @@ if __name__ == '__main__':
     plt.grid('off')
     plt.colorbar()
     plt.show()
+    print('done')
