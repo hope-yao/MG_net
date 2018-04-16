@@ -79,7 +79,7 @@ class VMG_geometric():
         self.imsize = cfg['imsize']
 
     def Ax_net(self, input_tensor, jacobi):
-        D_mat = -8./3. * self.jacobi.k
+        D_mat = -9./3. * self.jacobi.k
         LU_u = jacobi.LU_layers(input_tensor)
         return D_mat * input_tensor + LU_u
 
@@ -123,7 +123,7 @@ class VMG_geometric():
         while layer_i<self.max_depth: # 4h, 2h, h
             upper_level_sol = u_h['{}h'.format(2 ** (self.max_depth-layer_i-1))]
             upper_level_sol_dim = upper_level_sol.get_shape().as_list()[1:3]
-            upsampled_cur_level_sol = 1/4.*tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            upsampled_cur_level_sol = 1/4.*tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.BILINEAR)#NEAREST_NEIGHBOR
             # divided by 4 because surface force needs integration to become nodal force!
             cur_level_sol = upper_level_sol + upsampled_cur_level_sol
             cur_level_f = f_level['{}h'.format(2 ** (self.max_depth - layer_i - 1))]
@@ -141,22 +141,32 @@ if __name__ == '__main__':
     from tqdm import tqdm
 
     cfg = {
-        'batch_size': 16,
-        'imsize': 68,
+        'batch_size': 1,
+        'imsize': 64,
         'physics_problem': 'heat_transfer',  # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
-        'max_depth': 4, # depth of V cycle, degrade to Jacobi if set to 0
-        'alpha1': 50, # iteration at high frequency
-        'alpha2': 50, # iteration at low freqeuncy
+        'max_depth': 6, # depth of V cycle, degrade to Jacobi if set to 0
+        'alpha1': 1, # iteration at high frequency
+        'alpha2': 1, # iteration at low freqeuncy
+        'max_v_cycle': 500,
     }
 
-    f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
-    u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize']-2, cfg['imsize'], 1))
+    f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
+    u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
     jacobi = Jacobi_block(cfg)
     vmg = VMG_geometric(cfg, jacobi)
-    u_initial = f
-    vmg_result, vmg_u_h, vmg_u_correct = vmg.apply(f, u_initial) #second f is inital guess for u
-    jacobi_result = jacobi.apply(f, u_initial, max_itr=cfg['alpha2'])
+    # jacobi_result = jacobi.apply(f, u_initial, max_itr=cfg['alpha2'])
 
+    vmg_result_itr = {}
+    vmg_u_h_itr = {}
+    vmg_u_correct_itr = {}
+    u_initial = tf.zeros_like(f)
+    vmg_result_itr['v_0'], vmg_u_h_itr['v_0'], vmg_u_correct_itr['v_0'] = vmg.apply(f, u_initial) # f is inital guess for u
+    for v_idx in range(1, cfg['max_v_cycle'], 1):
+        vmg_result, vmg_u_h, vmg_u_correct = vmg.apply(f, vmg_result_itr['v_{}'.format(v_idx-1)]) # previous V cycle is inital guess for u
+        vmg_result_itr['v_{}'.format(v_idx)] = vmg_result
+        vmg_u_h_itr['v_{}'.format(v_idx)] = vmg_u_h
+        vmg_u_correct_itr['v_{}'.format(v_idx)] =  vmg_u_correct
+    vmg_result = vmg_result_itr['v_{}'.format(cfg['max_v_cycle']-1)]
 
     # optimizer
     loss = tf.reduce_mean(tf.abs(vmg_result - u ))
@@ -175,8 +185,14 @@ if __name__ == '__main__':
     f1 = data['matrix'][0][0][1]
     A1 = data['matrix'][0][0][0]
     u1 = np.linalg.solve(A1, f1)
-    u_gt = u1.reshape(1, cfg['imsize'] - 2, cfg['imsize'], 1)
-    f1 = f1.reshape(1, cfg['imsize'] - 2, cfg['imsize'], 1)
+    u_gt = u1.reshape(1, 66, 68, 1)[:,1:-1, 2:-2,:]
+    f1 = f1.reshape(1, 66, 68, 1)[:,1:-1, 2:-2,:]
+
+    # u1 = sio.loadmat('/home/hope-yao/Downloads/Solution_6664.mat')['U1'][:, 1:-1, :]
+    # f1 = sio.loadmat('/home/hope-yao/Downloads/Input_q.mat')['F1'][:, 1:-1, :]
+    #
+    # u_gt = u1.reshape(10, cfg['imsize'], cfg['imsize'], 1)
+    # f1 = f1.reshape(10, cfg['imsize'], cfg['imsize'], 1)
 
     u_input = np.tile(u_gt, (16, 1, 1, 1))
     f_input = np.tile(f1, (16, 1, 1, 1))

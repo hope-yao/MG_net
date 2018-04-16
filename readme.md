@@ -19,7 +19,10 @@ ground truth -> 16.0
 
 This is caused by the error in network prediction/ slow convergence v.s. network depth
 
-4. VMG accuracy:
+4. Higher order of upsampling will improve the accuracy.
+Down sample will casue error to accumulate if the number of pixels at one side is not even.
+
+VMG accuracy:
 
 2 level (50,20), 11.68%
 
@@ -27,4 +30,4 @@ This is caused by the error in network prediction/ slow convergence v.s. network
 
 4 level (50,20), 10.64%
 
-4 level (50,20), 10.61%
+4 level (50,50), 10.61%
