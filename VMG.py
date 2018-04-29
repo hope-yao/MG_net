@@ -79,7 +79,8 @@ class VMG_geometric():
         self.imsize = cfg['imsize']
 
     def Ax_net(self, input_tensor, jacobi):
-        D_mat = -9./3. * self.jacobi.k
+        D_mat = -8./3. * self.jacobi.k
+        u_input = tf.pad(input_tensor, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT")  # add zeros to Dirc BC
         LU_u = jacobi.LU_layers(input_tensor)
         return D_mat * input_tensor + LU_u
 
@@ -88,7 +89,7 @@ class VMG_geometric():
         u_hist = self.jacobi.apply(f, u, max_itr=max_itr)
         result['u'] = u_hist['final']
         ax = self.Ax_net(result['u'], self.jacobi)
-        result['res'] = f-ax
+        result['res'] = f[:,:,1:-1,:]-ax
         return result
 
     def apply(self, f, u):
@@ -97,7 +98,10 @@ class VMG_geometric():
         f_level['1h'] = f
         for layer_i in range(1, self.max_depth, 1):
             # times 4 because surface force needs integration to become nodal force!
-            f_level['{}h'.format(2**layer_i)] = f_i = 4.*tf.nn.avg_pool(f_i, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            f_i_center = 4.*tf.nn.avg_pool(f_i[:,:,1:-1:], ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
+            f_i = tf.pad(f_i_center, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT") # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
+            f_level['{}h'.format(2 ** layer_i)] = f_i
 
         u_h = {}
         r_h = {}
@@ -110,6 +114,7 @@ class VMG_geometric():
             r_h['{}h'.format(2**(layer_i-1))] = mg_result['res']
             # downsample residual to next level input
             cur_f = 4.*tf.nn.avg_pool(mg_result['res'], ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+            cur_f = tf.pad(cur_f, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT") # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
             cur_u = tf.zeros_like(cur_f) # inital 0 for residual
 
         # bottom level, lowest frequency part
@@ -123,9 +128,10 @@ class VMG_geometric():
         while layer_i<self.max_depth: # 4h, 2h, h
             upper_level_sol = u_h['{}h'.format(2 ** (self.max_depth-layer_i-1))]
             upper_level_sol_dim = upper_level_sol.get_shape().as_list()[1:3]
-            upsampled_cur_level_sol = 1/4.*tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.BILINEAR)#NEAREST_NEIGHBOR
+            upsampled_cur_level_sol = 0.25* tf.image.resize_images(cur_level_sol, size=upper_level_sol_dim,method=tf.image.ResizeMethod.BILINEAR)#NEAREST_NEIGHBOR
             # divided by 4 because surface force needs integration to become nodal force!
             cur_level_sol = upper_level_sol + upsampled_cur_level_sol
+            cur_level_sol = tf.pad(cur_level_sol, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT") # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
             cur_level_f = f_level['{}h'.format(2 ** (self.max_depth - layer_i - 1))]
             cur_level_sol_correct = self.jacobi.apply(cur_level_f, cur_level_sol, self.alpha_1)
             u_correct['{}h'.format(2**(self.max_depth-layer_i-1))] = cur_level_sol_correct['final']
@@ -144,14 +150,14 @@ if __name__ == '__main__':
         'batch_size': 1,
         'imsize': 64,
         'physics_problem': 'heat_transfer',  # candidates: 3D plate elasticity, helmholtz, vibro-acoustics
-        'max_depth': 6, # depth of V cycle, degrade to Jacobi if set to 0
-        'alpha1': 1, # iteration at high frequency
-        'alpha2': 1, # iteration at low freqeuncy
-        'max_v_cycle': 500,
+        'max_depth': 5, # depth of V cycle, degrade to Jacobi if set to 0
+        'alpha1': 3, # iteration at high frequency
+        'alpha2': 3, # iteration at low freqeuncy
+        'max_v_cycle': 20,
     }
 
-    f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
-    u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize'], 1))
+    f = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize']+2, 1))
+    u = tf.placeholder(tf.float32, shape=(cfg['batch_size'], cfg['imsize'], cfg['imsize']+2, 1))
     jacobi = Jacobi_block(cfg)
     vmg = VMG_geometric(cfg, jacobi)
     # jacobi_result = jacobi.apply(f, u_initial, max_itr=cfg['alpha2'])
@@ -160,10 +166,11 @@ if __name__ == '__main__':
     vmg_u_h_itr = {}
     vmg_u_correct_itr = {}
     u_initial = tf.zeros_like(f)
-    vmg_result_itr['v_0'], vmg_u_h_itr['v_0'], vmg_u_correct_itr['v_0'] = vmg.apply(f, u_initial) # f is inital guess for u
+    vmg_result, vmg_u_h_itr['v_0'], vmg_u_correct_itr['v_0'] = vmg.apply(f, u_initial) # f is inital guess for u
+    vmg_result_itr['v_0'] = tf.pad(vmg_result, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT") # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
     for v_idx in range(1, cfg['max_v_cycle'], 1):
         vmg_result, vmg_u_h, vmg_u_correct = vmg.apply(f, vmg_result_itr['v_{}'.format(v_idx-1)]) # previous V cycle is inital guess for u
-        vmg_result_itr['v_{}'.format(v_idx)] = vmg_result
+        vmg_result_itr['v_{}'.format(v_idx)] = tf.pad(vmg_result, tf.constant([[0, 0], [0, 0], [1, 1], [0, 0]]), "CONSTANT") # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
         vmg_u_h_itr['v_{}'.format(v_idx)] = vmg_u_h
         vmg_u_correct_itr['v_{}'.format(v_idx)] =  vmg_u_correct
     vmg_result = vmg_result_itr['v_{}'.format(cfg['max_v_cycle']-1)]
@@ -180,6 +187,15 @@ if __name__ == '__main__':
     sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
     sess.run(init)
+
+    u1 = sio.loadmat('/home/hope-yao/Downloads/Solution_200_6466.mat')['U1']
+    f1 = sio.loadmat('/home/hope-yao/Downloads/Input_200_q.mat')['F1']
+    idx = 41
+    loss_hist = []
+    for ii in range(1, 20, 1):
+        loss_hist += [
+            sess.run(tf.reduce_mean(tf.abs(vmg_result_itr['v_{}'.format(ii)][:, :, 1:-1, :] - u[:, :, 1:-1, :])),
+                     {f: f1[idx, :, :].reshape(1, 64, 66, 1), u: u1[idx, :, :].reshape(1, 64, 66, 1)})]
 
     data = sio.loadmat('/home/hope-yao/Downloads/matrix.mat')
     f1 = data['matrix'][0][0][1]

@@ -123,6 +123,7 @@ def ax_vs_wx():
     plt.show()
     print('error: {}'.format(np.mean(np.abs(bb-img[0,1:-1, :,  0]))))
 
+
 def Jacobi_solver_wx():
 
     A_weights = {}
@@ -173,4 +174,5 @@ def Jacobi_solver_wx():
 # Jacobi_solver_ax()
 # ax_vs_wx()
 # Jacobi_solver_wx()
-VMG_solver_ax()
+# VMG_solver_ax()
+ax_vs_wx_2phase()
