@@ -16,12 +16,23 @@ def load_data_elem(case):
                                 [1,   1,   1,   1,   1,   0,   0,   0,   0,],
                                 [1,   1,   1,   1,   1,   0,   0,   0,   0,]])
         mask_1 = np.asarray(mask_1, dtype='float32').reshape(1, 9, 9, 1)
-        mask_2 = np.ones_like(mask_1, dtype='float32') - mask_1
-        mask_2 = np.asarray(mask_2, dtype='float32').reshape(1, 9, 9, 1)
         f = u = np.ones((1,10,10,1), dtype='float32')
-        conductivity_1 = 10.
-        conductivity_2 = 100.
-    return u, f, mask_1, mask_2, conductivity_1, conductivity_2
+        conductivity_1 = np.float32(10.)
+        conductivity_2 = np.float32(100.)
+    elif case == 0:
+        mask_1 = sio.loadmat('./data/heat_transfer_2phase/mask.mat')['ind2']
+        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['f1']
+        u = sio.loadmat('./data/heat_transfer_2phase/steel_Aluminum_solution.mat')['u1']
+        conductivity_1 = np.float32(16.)
+        conductivity_2 = np.float32(205.)
+    elif case == 1:
+        mask_1 = sio.loadmat('./data/heat_transfer_2phase/mask.mat')['ind2']
+        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['f1']
+        u = sio.loadmat('./data/heat_transfer_2phase/steel_Air_solution.mat')['u1']
+        conductivity_1 = np.float32(16.)
+        conductivity_2 = np.float32(0.0262)
+
+    return u, f, mask_1, conductivity_1, conductivity_2
 
 
 def load_data(case):

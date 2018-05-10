@@ -238,155 +238,34 @@ def test_mask_conv_v3(data_case):
     return res, f
 
 
-########## This part is for customized differentiable convolution based on element mask#########
-
-def my_conv_grad(op, grad):
-
-    mask = op.inputs[0]  # partial derivative towards mask
-    resp = op.inputs[1]  # partial derivative towards response field
-
-    partial_mask = tf.zeros_like(mask)
-    # for i in range(1, resp.shape[1]-1, 1):
-    #     for j in range(1, resp.shape[1]-1, 1):
-    #         partial_mask[0, i-1, j-1, 0] = resp[0, i-1, j-1, 0] * grad[0, i-1, j, 0] \
-    #                                        + resp[0, i-1, j+1, 0] * grad[0, i, j, 0] \
-    #                                        + resp[0, i+1, j-1, 0] * grad[0, i, j, 0] \
-    #                                        + resp[0, i+1, j+1, 0] * grad[0, i, j, 0]
-    partial_resp = tf.zeros_like(resp)
-    return partial_mask, partial_resp# the propagated gradient with respect to the first and second argument respectively
-
-
-def np_my_conv(elem_mask, x, diag_coef=1., side_coef=1.):
-    y_diag = np.zeros_like(x)
-    for i in range(1, x.shape[1]-1, 1):
-        for j in range(1, x.shape[1]-1, 1):
-            y_diag[0, i-1, j-1, 0] = x[0, i-1, j-1, 0] * elem_mask[0, i-1, j-1, 0] \
-                                 + x[0, i-1, j+1, 0] * elem_mask[0, i-1, j, 0] \
-                                 + x[0, i+1, j-1, 0] * elem_mask[0, i, j-1, 0] \
-                                 + x[0, i+1, j+1, 0] * elem_mask[0, i, j, 0]
-    y_side = np.zeros_like(x)
-    for i in range(1, x.shape[2]-1, 1):
-        for j in range(1, x.shape[1]-1, 1):
-            y_side[0, i-1, j-1, 0] = x[0, i-1, j, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i-1, j, 0]) / 2. \
-                                 + x[0, i, j-1, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i, j-1, 0]) / 2. \
-                                 + x[0, i, j + 1, 0] * (elem_mask[0, i-1, j, 0] + elem_mask[0, i, j, 0]) / 2. \
-                                 + x[0, i+1, j, 0] * (elem_mask[0, i, j-1, 0] + elem_mask[0, i, j, 0]) / 2.
-    return diag_coef * y_diag + side_coef * y_side
-
-# def np_my_conv(elem, x, diag_coef=1., side_coef=1.):
-#     y_diag = np.zeros_like(x)
-#     for i in range(x.shape[1] - 2):
-#         for j in range(x.shape[1] - 2):
-#             y_diag[0, i, j, 0] = x[0, i, j, 0] * elem[0, i, j, 0] \
-#                                  + x[0, i, j + 2, 0] * elem[0, i, j + 1, 0] \
-#                                  + x[0, i + 2, j, 0] * elem[0, i + 1, j, 0] \
-#                                  + x[0, i + 2, j + 2, 0] * elem[0, i + 1, j + 1, 0]
-#     y_side = np.zeros_like(x)
-#     for i in range(x.shape[2] - 2):
-#         for j in range(x.shape[1] - 2):
-#             y_side[0, i, j, 0] = x[0, i, j + 1, 0] * (elem[0, i, j, 0] + elem[0, i, j + 1, 0]) / 2. \
-#                                  + x[0, i + 1, j, 0] * (elem[0, i, j, 0] + elem[0, i + 1, j, 0]) / 2. \
-#                                  + x[0, i + 1, j + 2, 0] * (elem[0, i, j + 1, 0] + elem[0, i + 1, j + 1, 0]) / 2. \
-#                                  + x[0, i + 2, j + 1, 0] * (elem[0, i + 1, j, 0] + elem[0, i + 1, j + 1, 0]) / 2.
-#     return diag_coef * y_diag + side_coef * y_side
-
-def py_func(func, inp, Tout, stateful=True, name=None, grad=None):
-
-    # Need to generate a unique name to avoid duplicates:
-    rnd_name = 'PyFuncGrad' + str(np.random.randint(0, 1E+8))
-
-    tf.RegisterGradient(rnd_name)(grad)  # see _MySquareGrad for grad example
-    g = tf.get_default_graph()
-    with g.gradient_override_map({"PyFunc": rnd_name}):
-        return tf.py_func(func, inp, Tout, stateful=stateful, name=name)
-
-
-from tensorflow.python.framework import ops
-
-
-def masked_conv_v4(x, y, name=None):
-
-    with ops.op_scope([x, y], name, "mod") as name:
-        z = py_func(np_my_conv,
-                    [x, y],
-                    [tf.float32],
-                    name=name,
-                    grad=my_conv_grad)  # <-- here's the call to the gradient
-        return z[0]
-
-
-def D_matrix(elem_mask, conductivity_1, conductivity_2):
-    padded_elem = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]],
-                         "SYMMETRIC")  # convolution with symmetric padding at boundary
-    node_filter = tf.constant([[[[1 / 4.]]] * 2] * 2)
-    node_mask_1 = tf.nn.conv2d(padded_elem, node_filter, strides=[1, 1, 1, 1], padding='VALID')
-    node_mask_2 = tf.ones_like(node_mask_1) - node_mask_1
-    d_matrix = node_mask_1 * conductivity_1 + node_mask_2 * conductivity_2
-    return d_matrix
-
-def masked_conv_v4_full(u, elem_mask, diag_coef, side_coef):
-
-    elem_mask_1 = elem_mask
-    LU_u_1 = np_my_conv(elem_mask_1, u, diag_coef=diag_coef, side_coef=side_coef)
-    elem_mask_2 = tf.ones_like(elem_mask) - elem_mask
-    LU_u_2 = np_my_conv(elem_mask_2, u, diag_coef=diag_coef, side_coef=side_coef)
-
-    LU_u = LU_u_1 + LU_u_2
-
-    tmp = {
-           'LU_u_1': LU_u_1,
-           'LU_u_2': LU_u_2,
-           'LU_u': LU_u,
-           }
-    return tmp
-
-
 if __name__ == '__main__':
     import scipy.io as sio
     import matplotlib.pyplot as plt
 
-    # res, f = test_mask_conv_v3(data_case=-1)
+    res, f = test_mask_conv_v3(data_case=-1)
 
-    # ## training starts ###
-    # FLAGS = tf.app.flags.FLAGS
-    # tfconfig = tf.ConfigProto(
-    #     allow_soft_placement=True,
-    #     log_device_placement=True,
-    # )
-    # tfconfig.gpu_options.allow_growth = True
-    # sess = tf.Session(config=tfconfig)
-    # img = sess.run(res)
-    # # visualize convolution result
-    # plt.figure()
-    # img = sess.run(res)['result'][0, 1:-1, 1:-1, 0]
-    # img[:,31] = 0
-    # img[:,33] = 0
-    # plt.imshow(img, cmap='jet')
-    # plt.colorbar()
-    # plt.grid('off')
-    # # visualize ground truth
-    # plt.figure()
-    # plt.imshow(f[1:-1, 1:-1], cmap='jet')
-    # plt.colorbar()
-    # plt.grid('off')
-    # plt.show()
-    #
+    ## training starts ###
+    FLAGS = tf.app.flags.FLAGS
+    tfconfig = tf.ConfigProto(
+        allow_soft_placement=True,
+        log_device_placement=True,
+    )
+    tfconfig.gpu_options.allow_growth = True
+    sess = tf.Session(config=tfconfig)
+    img = sess.run(res)
+    # visualize convolution result
+    plt.figure()
+    img = sess.run(res)['result'][0, 1:-1, 1:-1, 0]
+    img[:,31] = 0
+    img[:,33] = 0
+    plt.imshow(img, cmap='jet')
+    plt.colorbar()
+    plt.grid('off')
+    # visualize ground truth
+    plt.figure()
+    plt.imshow(f[1:-1, 1:-1], cmap='jet')
+    plt.colorbar()
+    plt.grid('off')
+    plt.show()
 
-    with tf.Session() as sess:
-        from data_loader import load_data_elem
-
-        u, f, mask_1, mask_2, conductivity_1, conductivity_2 = load_data_elem(case=-1)
-        mask_1 = tf.constant(mask_1)
-        mask_2 = tf.ones_like(mask_1)-mask_1
-        u = tf.constant(u)
-        z_1 = masked_conv_v4(mask_1, u)
-        z_2 = masked_conv_v4(mask_2, u)
-        z = z_1 + z_2
-
-        # mask_pl = mask_1#tf.placeholder(tf.float32, shape=(1, 10, 10, 1))
-        # u_pl = u#tf.placeholder(tf.float32, shape=(1, 10, 10, 1))
-        gr = tf.gradients(z, [mask_1, u])
-        tf.initialize_all_variables().run()
-        print(z_1.eval(), z_2.eval(), z.eval(), gr[0].eval(), gr[1].eval())
-    print('done')
 

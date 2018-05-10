@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from ops import new_weight_variable, new_bias_variable
+from test_ops import new_weight_variable, new_bias_variable
 import scipy.io as sio
 import matplotlib.pyplot as plt
 import seaborn as sns

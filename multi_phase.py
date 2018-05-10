@@ -1,34 +1,37 @@
 import numpy as np
 import tensorflow as tf
-from ops import masked_conv, masked_conv_v2
-from data_loader import load_data
+from custom_ops import tf_conv_2phase as masked_conv
+from custom_ops import get_D_matrix
+from data_loader import load_data_elem
 
-def jacobi_itr(u_input, f_input, mask_1, mask_2, conductivity_1, conductivity_2):
-    w_filter_1 = np.asarray([[1., 1., 1.], [1., 0., 1.], [1., 1., 1.]], 'float32') * conductivity_1 / 3.
-    w_filter_1 = tf.constant(w_filter_1.reshape((3, 3, 1, 1)))
-    w_filter_2 = np.asarray([[1., 1., 1.], [1., 0., 1.], [1., 1., 1.]], 'float32') * conductivity_2 / 3.
-    w_filter_2 = tf.constant(w_filter_2.reshape((3, 3, 1, 1)))
+def jacobi_itr(u_input, f_input, d_matrix, elem_mask, conductivity_1, conductivity_2):
 
-    conv_res = masked_conv(u_input, w_filter_1, w_filter_2, mask_1, mask_2, conductivity_1, conductivity_2)
-    u_new = (f_input - conv_res['LU_u']) / conv_res['d_matrix']
-    u_new = tf.pad(u_new[:,1:-1,1:-1,:], tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]]),"CONSTANT")  # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
+    LU_u = masked_conv(elem_mask, u_input, conductivity_1, conductivity_2)
+    u_new = (f_input - LU_u['LU_u']) / d_matrix
+    u_new = tf.pad(u_new[:,:,1:,:], tf.constant([[0, 0], [0, 0], [1, 0], [0, 0]]),"CONSTANT")  # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
 
-    return u_new, conv_res
+    return u_new, LU_u
 
 
 def main():
-    u_ref, f_ref, region_1, region_2, conductivity_1, conductivity_2 = load_data(case=1)
-    f_input = tf.placeholder(tf.float32, shape=(1, 66, 66, 1))
-    u_input = tf.placeholder(tf.float32, shape=(1, 66, 66, 1))
-    mask_1 = tf.placeholder(tf.float32, shape=(1, 66, 66, 1))
-    mask_2 = tf.placeholder(tf.float32, shape=(1, 66, 66, 1))
-    u_hist = [u_input]
-    res_hist = []
-    for i in range(2000):
-        u_new, res = jacobi_itr(u_hist[-1], f_input, mask_1, mask_2, conductivity_1, conductivity_2)
-        u_hist += [u_new]
-        res_hist += [res]
+    n_elem_x = n_elem_y = 64
+    conductivity_1 = tf.placeholder(tf.float32, shape=())
+    conductivity_2 = tf.placeholder(tf.float32, shape=())
+    f_input = tf.placeholder(tf.float32, shape=(1, n_elem_x+1, n_elem_y+1, 1))
+    u_input = tf.placeholder(tf.float32, shape=(1, n_elem_x+1, n_elem_y+1, 1))
+    elem_mask = tf.placeholder(tf.float32, shape=(1, n_elem_x, n_elem_y, 1))
 
+    d_matrix = get_D_matrix(elem_mask, conductivity_1, conductivity_2)
+
+    n_itr = 100
+    u_hist = [u_input]
+    LU_u_hist = []
+    for i in range(n_itr):
+        u_new, LU_u = jacobi_itr(u_hist[-1], f_input, d_matrix, elem_mask, conductivity_1, conductivity_2)
+        u_hist += [u_new]
+        LU_u_hist += [LU_u]
+
+    u_gt, f_gt, elem_mask_gt, conductivity_1, conductivity_2 = load_data_elem(case=0)
 
     ## training starts ###
     FLAGS = tf.app.flags.FLAGS
@@ -42,12 +45,11 @@ def main():
     sess.run(init)
 
     loss_hist = []
-    feed_dict = {f_input: f_ref.reshape(1, 66, 66, 1),
-                 u_input: np.zeros_like(u_ref.reshape(1, 66, 66, 1)),
-                 mask_1: region_1,
-                 mask_2: region_2}
+    feed_dict = {f_input: f_gt.reshape(1, n_elem_x+1, n_elem_y+1, 1),
+                 u_input: np.zeros_like(u_gt.reshape(1, n_elem_x+1, n_elem_y+1, 1)),
+                 elem_mask: elem_mask_gt}
     for ii in range(1, 2000, 100):
-        loss_hist += [sess.run(tf.reduce_mean(tf.abs(u_hist[ii] - u_ref)),feed_dict)]
+        loss_hist += [sess.run(tf.reduce_mean(tf.abs(u_hist[ii] - u_gt)),feed_dict)]
 
     import matplotlib.pyplot as plt
     plt.figure()
@@ -55,7 +57,7 @@ def main():
     plt.colorbar()
     plt.grid('off')
     plt.figure()
-    plt.imshow(u_ref[0, 1:-1, 1:-1, 0], cmap='jet')
+    plt.imshow(u_gt[0, 1:-1, 1:-1, 0], cmap='jet')
     plt.colorbar()
     plt.grid('off')
     plt.show()

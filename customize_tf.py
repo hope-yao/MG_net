@@ -9,7 +9,7 @@ def modgrad(op, grad):
     x = op.inputs[0] # the first argument (normally you need those to calculate the gradient, like the gradient of x^2 is 2x. )
     y = op.inputs[1] # the second argument
 
-    return grad * 1, grad * tf.negative(tf.floordiv(x, y)) #the propagated gradient with respect to the first and second argument respectively
+    return grad * 1, grad * tf.negative(np.floor(x, y)) #the propagated gradient with respect to the first and second argument respectively
 
 def np_mod(x,y):
     return (x % y).astype(np.float32)
