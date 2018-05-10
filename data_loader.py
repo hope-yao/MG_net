@@ -4,30 +4,38 @@ import scipy.io as sio
 
 def load_data_elem(case):
     # case = 1
-    if case == -1:
+    if case == -2:
+        # all steel
+        # u = np.zeros((66, 66), 'float32')
+        u = sio.loadmat('/home/hope-yao/Downloads/steel_U.mat')['U1'][0][1:-1, 1:-1]
+        f = sio.loadmat('/home/hope-yao/Downloads/steel_q.mat')['F1'][0][1:-1,1:-1]
+        mask_1 = np.asarray([[1., ] * 43 + [0.] * 20] * 63, dtype='float32')
+        conductivity_1 = np.float32(16.)
+        conductivity_2 = np.float32(16.)
+    elif case == -1:
         # toy case
-        mask_1 =    np.asarray([[1,   1,   1,   1,   1,   1,   1,   1,   1,],
-                                [1,   1,   1,   1,   0,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   0,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   0,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   0,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   1,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   1,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   1,   0,   0,   0,   0,],
-                                [1,   1,   1,   1,   1,   0,   0,   0,   0,]])
-        mask_1 = np.asarray(mask_1, dtype='float32').reshape(1, 9, 9, 1)
-        f = u = np.ones((1,10,10,1), dtype='float32')
+        mask_1 = np.asarray([[1, 1, 1, 1, 1, 1, 1, 1, 1, ],
+                             [1, 1, 1, 1, 0, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 0, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 0, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 0, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 1, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 1, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 1, 0, 0, 0, 0, ],
+                             [1, 1, 1, 1, 1, 0, 0, 0, 0, ]])
+        mask_1 = np.asarray(mask_1, dtype='float32')
+        f = u = np.ones((1, 10, 10, 1), dtype='float32')
         conductivity_1 = np.float32(10.)
         conductivity_2 = np.float32(100.)
     elif case == 0:
         mask_1 = sio.loadmat('./data/heat_transfer_2phase/mask.mat')['ind2']
-        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['f1']
+        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['aa']
         u = sio.loadmat('./data/heat_transfer_2phase/steel_Aluminum_solution.mat')['u1']
         conductivity_1 = np.float32(16.)
         conductivity_2 = np.float32(205.)
     elif case == 1:
         mask_1 = sio.loadmat('./data/heat_transfer_2phase/mask.mat')['ind2']
-        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['f1']
+        f = sio.loadmat('./data/heat_transfer_2phase/input_heatFlux.mat')['aa']
         u = sio.loadmat('./data/heat_transfer_2phase/steel_Air_solution.mat')['u1']
         conductivity_1 = np.float32(16.)
         conductivity_2 = np.float32(0.0262)

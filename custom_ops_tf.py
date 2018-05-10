@@ -8,6 +8,165 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.python.framework import ops
 
+def get_D_matrix(elem_mask, conductivity_1, conductivity_2):
+    '''
+
+    :param elem_mask:
+    :param conductivity_1:
+    :param conductivity_2:
+    :return:
+    '''
+    # convolution with symmetric padding at boundary
+    padded_elem = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]],"SYMMETRIC")
+    node_filter = tf.constant([[[[1 / 4.]]] * 2] * 2)
+    # first material phase
+    node_mask_1 = tf.nn.conv2d(padded_elem, node_filter, strides=[1, 1, 1, 1], padding='VALID')
+    # second material phase
+    node_mask_2 = tf.ones_like(node_mask_1) - node_mask_1
+    d_matrix = node_mask_1 * conductivity_1 + node_mask_2 * conductivity_2
+    return d_matrix
+
+def tf_mask_conv(elem_mask, node_resp, diag_coef=1/3., side_coef=1/3.):
+    padded_res = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    # diagnal part
+    for i in range(1, padded_res.shape[1]-1, 1):
+        for j in range(1, padded_res.shape[1]-1, 1):
+            y_diag_i_j = padded_res[0, i-1, j-1, 0] * padded_mask[0, i-1, j-1, 0] \
+                     + padded_res[0, i-1, j+1, 0] * padded_mask[0, i-1, j, 0] \
+                     + padded_res[0, i+1, j-1, 0] * padded_mask[0, i, j-1, 0] \
+                     + padded_res[0, i+1, j+1, 0] * padded_mask[0, i, j, 0]
+            y_diag = tf.reshape(y_diag_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_diag, tf.reshape(y_diag_i_j, (1, 1))], axis=0)
+    y_diag = tf.reshape(y_diag, (node_resp.get_shape().as_list()))
+    # side part
+    for i in range(1, padded_res.shape[2]-1, 1):
+        for j in range(1, padded_res.shape[1]-1, 1):
+            y_side_i_j = padded_res[0, i-1, j, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i-1, j, 0]) / 2. \
+                     + padded_res[0, i, j-1, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i, j-1, 0]) / 2. \
+                     + padded_res[0, i, j + 1, 0] * (padded_mask[0, i-1, j, 0] + padded_mask[0, i, j, 0]) / 2. \
+                     + padded_res[0, i+1, j, 0] * (padded_mask[0, i, j-1, 0] + padded_mask[0, i, j, 0]) / 2.
+            y_side = tf.reshape(y_side_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_side, tf.reshape(y_side_i_j, (1, 1))], axis=0)
+    y_side = tf.reshape(y_side, (node_resp.get_shape().as_list()))
+    return diag_coef * y_diag + side_coef * y_side
+
+def tf_fast_mask_conv(elem_mask, node_resp, coef):
+    '''
+    combined two tf_mask_conv together
+    :param elem_mask:
+    :param node_resp:
+    :param coef:
+    :return:
+    '''
+    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
+    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
+    padded_resp = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    # diagnal part
+    for i in range(1, padded_resp.shape[1]-1, 1):
+        for j in range(1, padded_resp.shape[1]-1, 1):
+            y_diag_i_j = padded_resp[0, i-1, j-1, 0] * padded_mask[0, i-1, j-1, 0] \
+                     + padded_resp[0, i-1, j+1, 0] * padded_mask[0, i-1, j, 0] \
+                     + padded_resp[0, i+1, j-1, 0] * padded_mask[0, i, j-1, 0] \
+                     + padded_resp[0, i+1, j+1, 0] * padded_mask[0, i, j, 0]
+            y_diag = tf.reshape(y_diag_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_diag, tf.reshape(y_diag_i_j, (1, 1))], axis=0)
+    y_diag = tf.reshape(y_diag, (node_resp.get_shape().as_list()))
+    # side part
+    for i in range(1, padded_resp.shape[2]-1, 1):
+        for j in range(1, padded_resp.shape[1]-1, 1):
+            y_side_i_j = padded_resp[0, i-1, j, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i-1, j, 0]) / 2. \
+                     + padded_resp[0, i, j-1, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i, j-1, 0]) / 2. \
+                     + padded_resp[0, i, j + 1, 0] * (padded_mask[0, i-1, j, 0] + padded_mask[0, i, j, 0]) / 2. \
+                     + padded_resp[0, i+1, j, 0] * (padded_mask[0, i, j-1, 0] + padded_mask[0, i, j, 0]) / 2.
+            y_side = tf.reshape(y_side_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_side, tf.reshape(y_side_i_j, (1, 1))], axis=0)
+    y_side = tf.reshape(y_side, (node_resp.get_shape().as_list()))
+    # remaining
+    for i in range(1, padded_resp.shape[2]-1, 1):
+        for j in range(1, padded_resp.shape[1]-1, 1):
+            y_remain_i_j = padded_resp[0, i-1, j, 0]  + padded_resp[0, i, j-1, 0]  \
+                         + padded_resp[0, i, j + 1, 0]+ padded_resp[0, i+1, j, 0]
+            y_remain = tf.reshape(y_remain_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_remain, tf.reshape(y_remain_i_j, (1, 1))], axis=0)
+    y_remain = tf.reshape(y_remain, (node_resp.get_shape().as_list()))
+    conv_result = (diag_coef_1 - diag_coef_2) * y_diag + diag_coef_2 * y_remain\
+                + (side_coef_1 - side_coef_2) * y_side  + side_coef_2 * y_remain
+    return conv_result
+
+def tf_faster_mask_conv(elem_mask, node_resp, coef):
+    '''
+    combined side and diag part of tf_fast_mask_conv together
+    :param elem_mask:
+    :param node_resp:
+    :param coef:
+    :return:
+    '''
+    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
+    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
+    diag_coef_diff = diag_coef_1 - diag_coef_2
+    side_coef_diff = side_coef_1 - side_coef_2
+    padded_resp = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
+    for i in range(1, padded_resp.shape[1]-1, 1):
+        for j in range(1, padded_resp.shape[1]-1, 1):
+            conv_result_i_j = \
+            padded_mask[0, i - 1, j - 1, 0] * \
+            (
+                    padded_resp[0, i - 1, j - 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i - 1, j, 0] * \
+            (
+                    padded_resp[0, i - 1, j + 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j + 1, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i, j - 1, 0] * \
+            (
+                    padded_resp[0, i + 1, j - 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i, j - 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i, j, 0] * \
+            (
+                    padded_resp[0, i + 1, j + 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
+            ) + \
+            (diag_coef_2+diag_coef_2) * \
+            (
+                    padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]
+                    + padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]
+            )
+            conv_result = tf.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([conv_result, tf.reshape(conv_result_i_j, (1, 1))], axis=0)
+    LU_u = tf.reshape(conv_result, (node_resp.get_shape().as_list())) + (diag_coef_2 + side_coef_2) * node_resp
+
+    tmp = {
+        'LU_u': LU_u
+    }
+    return tmp
+
+def tf_conv_2phase(elem_mask, node_resp, coef_dict):
+    '''
+
+    :param elem_mask:
+    :param node_resp:
+    :param diag_coef:
+    :param side_coef:
+    :return:
+    '''
+    conductivity_1 = coef_dict['conductivity_1']
+    conductivity_2 = coef_dict['conductivity_2']
+    elem_mask_1 = elem_mask
+    diag_coef_1 = side_coef_1 = conductivity_1/ 3.
+    # first material phase on LU part
+    LU_u_1 = tf_mask_conv(elem_mask_1, node_resp, diag_coef=diag_coef_1, side_coef=side_coef_1)
+    elem_mask_2 = tf.ones_like(elem_mask) - elem_mask
+    diag_coef_2 = side_coef_2 = conductivity_2/ 3.
+    # second material phase on LU part
+    LU_u_2 = tf_mask_conv(elem_mask_2, node_resp, diag_coef=diag_coef_2, side_coef=side_coef_2)
+    LU_u = LU_u_1 + LU_u_2
+    tmp = {
+           'LU_u': LU_u,
+           'LU_u_1': LU_u_1,
+           'LU_u_2': LU_u_2,
+           }
+    return tmp
+
 def mask_conv_grad(op, grads):
     '''
         gradient of the mask convolution operator
@@ -110,180 +269,6 @@ def fast_mask_conv_grad(op, grads):
     # the propagated gradient with respect to the first and second argument respectively
     return partial_mask, partial_resp
 
-def np_mask_conv(elem_mask, x, diag_coef=1., side_coef=1., center_coef=-8.):
-    '''
-    use numpy to test the mask convolution
-    :param elem_mask: mask on the element
-    :param x: response field
-    :param diag_coef: coefficient on the diagnal part of the element stiffness matrix
-    :param side_coef: 2x coefficient on the side part of the element stiffness matrix
-    :return:
-    '''
-    # diagnal part
-    y_diag = np.zeros_like(x)
-    for i in range(1, x.shape[1]-1, 1):
-        for j in range(1, x.shape[1]-1, 1):
-            y_diag[0, i-1, j-1, 0] = x[0, i-1, j-1, 0] * elem_mask[0, i-1, j-1, 0] \
-                                 + x[0, i-1, j+1, 0] * elem_mask[0, i-1, j, 0] \
-                                 + x[0, i+1, j-1, 0] * elem_mask[0, i, j-1, 0] \
-                                 + x[0, i+1, j+1, 0] * elem_mask[0, i, j, 0]
-    # side part
-    y_side = np.zeros_like(x)
-    for i in range(1, x.shape[2]-1, 1):
-        for j in range(1, x.shape[1]-1, 1):
-            y_side[0, i-1, j-1, 0] = x[0, i-1, j, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i-1, j, 0]) / 2. \
-                                 + x[0, i, j-1, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i, j-1, 0]) / 2. \
-                                 + x[0, i, j + 1, 0] * (elem_mask[0, i-1, j, 0] + elem_mask[0, i, j, 0]) / 2. \
-                                 + x[0, i+1, j, 0] * (elem_mask[0, i, j-1, 0] + elem_mask[0, i, j, 0]) / 2.
-    return diag_coef * y_diag + side_coef * y_side
-
-def tf_mask_conv(elem_mask, node_resp, diag_coef=1/3., side_coef=1/3.):
-    padded_res = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    # diagnal part
-    for i in range(1, padded_res.shape[1]-1, 1):
-        for j in range(1, padded_res.shape[1]-1, 1):
-            y_diag_i_j = padded_res[0, i-1, j-1, 0] * padded_mask[0, i-1, j-1, 0] \
-                     + padded_res[0, i-1, j+1, 0] * padded_mask[0, i-1, j, 0] \
-                     + padded_res[0, i+1, j-1, 0] * padded_mask[0, i, j-1, 0] \
-                     + padded_res[0, i+1, j+1, 0] * padded_mask[0, i, j, 0]
-            y_diag = tf.reshape(y_diag_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_diag, tf.reshape(y_diag_i_j, (1, 1))], axis=0)
-    y_diag = tf.reshape(y_diag, (node_resp.get_shape().as_list()))
-    # side part
-    for i in range(1, padded_res.shape[2]-1, 1):
-        for j in range(1, padded_res.shape[1]-1, 1):
-            y_side_i_j = padded_res[0, i-1, j, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i-1, j, 0]) / 2. \
-                     + padded_res[0, i, j-1, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i, j-1, 0]) / 2. \
-                     + padded_res[0, i, j + 1, 0] * (padded_mask[0, i-1, j, 0] + padded_mask[0, i, j, 0]) / 2. \
-                     + padded_res[0, i+1, j, 0] * (padded_mask[0, i, j-1, 0] + padded_mask[0, i, j, 0]) / 2.
-            y_side = tf.reshape(y_side_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_side, tf.reshape(y_side_i_j, (1, 1))], axis=0)
-    y_side = tf.reshape(y_side, (node_resp.get_shape().as_list()))
-    return diag_coef * y_diag + side_coef * y_side
-
-
-def tf_fast_mask_conv(elem_mask, node_resp, coef):
-    '''
-    combined two tf_mask_conv together
-    :param elem_mask:
-    :param node_resp:
-    :param coef:
-    :return:
-    '''
-    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
-    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
-    padded_resp = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    # diagnal part
-    for i in range(1, padded_resp.shape[1]-1, 1):
-        for j in range(1, padded_resp.shape[1]-1, 1):
-            y_diag_i_j = padded_resp[0, i-1, j-1, 0] * padded_mask[0, i-1, j-1, 0] \
-                     + padded_resp[0, i-1, j+1, 0] * padded_mask[0, i-1, j, 0] \
-                     + padded_resp[0, i+1, j-1, 0] * padded_mask[0, i, j-1, 0] \
-                     + padded_resp[0, i+1, j+1, 0] * padded_mask[0, i, j, 0]
-            y_diag = tf.reshape(y_diag_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_diag, tf.reshape(y_diag_i_j, (1, 1))], axis=0)
-    y_diag = tf.reshape(y_diag, (node_resp.get_shape().as_list()))
-    # side part
-    for i in range(1, padded_resp.shape[2]-1, 1):
-        for j in range(1, padded_resp.shape[1]-1, 1):
-            y_side_i_j = padded_resp[0, i-1, j, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i-1, j, 0]) / 2. \
-                     + padded_resp[0, i, j-1, 0] * (padded_mask[0, i-1, j-1, 0] + padded_mask[0, i, j-1, 0]) / 2. \
-                     + padded_resp[0, i, j + 1, 0] * (padded_mask[0, i-1, j, 0] + padded_mask[0, i, j, 0]) / 2. \
-                     + padded_resp[0, i+1, j, 0] * (padded_mask[0, i, j-1, 0] + padded_mask[0, i, j, 0]) / 2.
-            y_side = tf.reshape(y_side_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([y_side, tf.reshape(y_side_i_j, (1, 1))], axis=0)
-    y_side = tf.reshape(y_side, (node_resp.get_shape().as_list()))
-    conv_result = (diag_coef_1 - diag_coef_2) * y_diag + diag_coef_2 * resp\
-                + (side_coef_1 - side_coef_2) * y_side  + side_coef_2 * resp
-    return conv_result
-
-def tf_faster_mask_conv(elem_mask, node_resp, coef):
-    '''
-    combined side and diag part of tf_fast_mask_conv together
-    :param elem_mask:
-    :param node_resp:
-    :param coef:
-    :return:
-    '''
-    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
-    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
-    diag_coef_diff = diag_coef_1 - diag_coef_2
-    side_coef_diff = side_coef_1 - side_coef_2
-    padded_resp = tf.pad(node_resp, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    padded_mask = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-    for i in range(1, padded_resp.shape[1]-1, 1):
-        for j in range(1, padded_resp.shape[1]-1, 1):
-            conv_result_i_j = \
-            padded_mask[0, i - 1, j - 1, 0] * \
-            (
-                    padded_resp[0, i - 1, j - 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i - 1, j, 0] * \
-            (
-                    padded_resp[0, i - 1, j + 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j + 1, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i, j - 1, 0] * \
-            (
-                    padded_resp[0, i + 1, j - 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i, j - 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i, j, 0] * \
-            (
-                    padded_resp[0, i + 1, j + 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
-            )
-            conv_result = tf.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else tf.concat([conv_result, tf.reshape(conv_result_i_j, (1, 1))], axis=0)
-    LU_u = tf.reshape(conv_result, (node_resp.get_shape().as_list())) + (diag_coef_2 + side_coef_2) * node_resp
-
-    tmp = {
-        'LU_u': LU_u
-    }
-    return tmp
-
-def tf_conv_2phase(elem_mask, node_resp, coef_dict):
-    '''
-
-    :param elem_mask:
-    :param node_resp:
-    :param diag_coef:
-    :param side_coef:
-    :return:
-    '''
-    conductivity_1 = coef_dict['conductivity_1']
-    conductivity_2 = coef_dict['conductivity_2']
-    elem_mask_1 = elem_mask
-    diag_coef_1 = side_coef_1 = conductivity_1/ 3.
-    # first material phase on LU part
-    LU_u_1 = tf_mask_conv(elem_mask_1, node_resp, diag_coef=diag_coef_1, side_coef=side_coef_1)
-    elem_mask_2 = tf.ones_like(elem_mask) - elem_mask
-    diag_coef_2 = side_coef_2 = conductivity_2/ 3.
-    # second material phase on LU part
-    LU_u_2 = tf_mask_conv(elem_mask_2, node_resp, diag_coef=diag_coef_2, side_coef=side_coef_2)
-    LU_u = LU_u_1 + LU_u_2
-    tmp = {
-           'LU_u': LU_u,
-           'LU_u_1': LU_u_1,
-           'LU_u_2': LU_u_2,
-           }
-    return tmp
-def get_D_matrix(elem_mask, conductivity_1, conductivity_2):
-    '''
-
-    :param elem_mask:
-    :param conductivity_1:
-    :param conductivity_2:
-    :return:
-    '''
-    # convolution with symmetric padding at boundary
-    padded_elem = tf.pad(elem_mask, [[0, 0], [1, 1], [1, 1], [0, 0]],"SYMMETRIC")
-    node_filter = tf.constant([[[[1 / 4.]]] * 2] * 2)
-    # first material phase
-    node_mask_1 = tf.nn.conv2d(padded_elem, node_filter, strides=[1, 1, 1, 1], padding='VALID')
-    # second material phase
-    node_mask_2 = tf.ones_like(node_mask_1) - node_mask_1
-    d_matrix = node_mask_1 * conductivity_1 + node_mask_2 * conductivity_2
-    return d_matrix
-
 def tf_mask_conv_full(elem_mask, node_resp, coef_dict ):
     conductivity_1 = coef_dict['conductivity_1']
     conductivity_2 = coef_dict['conductivity_2']
@@ -305,7 +290,6 @@ def tf_mask_conv_full(elem_mask, node_resp, coef_dict ):
            }
     return tmp
 
-
 def py_func(func, inp, Tout, stateful=True, name=None, grad=None):
 
     # Need to generate a unique name to avoid duplicates:
@@ -315,7 +299,6 @@ def py_func(func, inp, Tout, stateful=True, name=None, grad=None):
     g = tf.get_default_graph()
     with g.gradient_override_map({"PyFunc": rnd_name}):
         return tf.py_func(func, inp, Tout, stateful=stateful, name=name)
-
 
 def mask_conv(mask, resp, diag_coef, side_coef, name=None):
 
@@ -329,11 +312,12 @@ def mask_conv(mask, resp, diag_coef, side_coef, name=None):
 
 
 if __name__ == '__main__':
+    n_elem_x = n_elem_y = 64
     # build graph
     conductivity_1_pl = tf.placeholder(tf.float32, shape=())
     conductivity_2_pl = tf.placeholder(tf.float32, shape=())
-    elem_mask_pl = tf.placeholder(tf.float32, shape=(1, 9, 9, 1))
-    node_resp_pl = tf.placeholder(tf.float32, shape=(1, 10, 10, 1))
+    elem_mask_pl = tf.placeholder(tf.float32, shape=(1, n_elem_x, n_elem_y, 1))
+    node_resp_pl = tf.placeholder(tf.float32, shape=(1, n_elem_x+1, n_elem_y+1, 1))
     coef_dict = {
         'conductivity_1': conductivity_1_pl,
         'conductivity_2': conductivity_2_pl,

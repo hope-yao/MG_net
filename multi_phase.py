@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
-from custom_ops import tf_conv_2phase as masked_conv
-from custom_ops import get_D_matrix
+from custom_ops_tf import tf_conv_2phase as masked_conv
+from custom_ops_tf import get_D_matrix
 from data_loader import load_data_elem
 
 def jacobi_itr(u_input, f_input, d_matrix, elem_mask, conductivity_1, conductivity_2):
