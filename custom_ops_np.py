@@ -46,7 +46,7 @@ def np_mask_conv(elem_mask, node_resp, diag_coef, side_coef):
                                  + x[0, i+1, j+1, 0] * elem_mask[0, i, j, 0]
     # side part
     y_side = np.zeros_like(node_resp)
-    for i in range(1, x.shape[2]-1, 1):
+    for i in range(1, x.shape[1]-1, 1):
         for j in range(1, x.shape[1]-1, 1):
             y_side[0, i-1, j-1, 0] = x[0, i-1, j, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i-1, j, 0]) / 2. \
                                  + x[0, i, j-1, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i, j-1, 0]) / 2. \
@@ -94,12 +94,46 @@ def np_fast_mask_conv(elem_mask, node_resp, coef):
             y_remain = np.reshape(y_remain_i_j, (1, 1)) if i == 1 and j == 1 else np.concatenate([y_remain, np.reshape(y_remain_i_j, (1, 1))], axis=0)
     y_remain = np.reshape(y_remain, (node_resp.shape))
     LU_u = (diag_coef_1 - diag_coef_2) * y_diag + diag_coef_2 * y_remain\
-                + (side_coef_1 - side_coef_2) * y_side  + side_coef_2 * y_remain
+            + (side_coef_1 - side_coef_2) * y_side  + side_coef_2 * y_remain
     tmp = {
         'LU_u': LU_u
     }
     return tmp
 
+def np_faster_mask_conv_correct(elem_mask_orig, node_resp, coef):
+    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
+    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
+    x  = np.pad(node_resp, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
+    elem_mask = np.pad(elem_mask_orig, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
+    y_diag_1 = np.zeros_like(node_resp)
+    y_side_1 = np.zeros_like(node_resp)
+    y_diag_2 = np.zeros_like(node_resp)
+    y_side_2 = np.zeros_like(node_resp)
+    for i in range(1, x.shape[1]-1, 1):
+        for j in range(1, x.shape[1]-1, 1):
+            y_diag_1[0, i-1, j-1, 0] = x[0, i-1, j-1, 0] * elem_mask[0, i-1, j-1, 0] *diag_coef_1 \
+                                 + x[0, i-1, j+1, 0] * elem_mask[0, i-1, j, 0] *diag_coef_1 \
+                                 + x[0, i+1, j-1, 0] * elem_mask[0, i, j-1, 0] *diag_coef_1 \
+                                 + x[0, i+1, j+1, 0] * elem_mask[0, i, j, 0] *diag_coef_1
+            y_side_1[0, i-1, j-1, 0] = x[0, i-1, j, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i-1, j, 0]) / 2. *side_coef_1 \
+                                 + x[0, i, j-1, 0] * (elem_mask[0, i-1, j-1, 0] + elem_mask[0, i, j-1, 0]) / 2. *side_coef_1\
+                                 + x[0, i, j + 1, 0] * (elem_mask[0, i-1, j, 0] + elem_mask[0, i, j, 0]) / 2. *side_coef_1\
+                                 + x[0, i+1, j, 0] * (elem_mask[0, i, j-1, 0] + elem_mask[0, i, j, 0]) / 2. *side_coef_1
+            y_diag_2[0, i-1, j-1, 0] = x[0, i-1, j-1, 0] * (1-elem_mask[0, i-1, j-1, 0]) *diag_coef_2 \
+                                 + x[0, i-1, j+1, 0] * (1-elem_mask[0, i-1, j, 0] )*diag_coef_2 \
+                                 + x[0, i+1, j-1, 0] * (1-elem_mask[0, i, j-1, 0]) *diag_coef_2 \
+                                 + x[0, i+1, j+1, 0] * (1-elem_mask[0, i, j, 0]) *diag_coef_2
+            y_side_2[0, i-1, j-1, 0] = x[0, i-1, j, 0] * (2-elem_mask[0, i-1, j-1, 0] - elem_mask[0, i-1, j, 0]) / 2. *side_coef_2 \
+                                 + x[0, i, j-1, 0] * (2-elem_mask[0, i-1, j-1, 0] - elem_mask[0, i, j-1, 0]) / 2. *side_coef_2\
+                                 + x[0, i, j + 1, 0] * (2-elem_mask[0, i-1, j, 0] - elem_mask[0, i, j, 0]) / 2. *side_coef_2\
+                                 + x[0, i+1, j, 0] * (2-elem_mask[0, i, j-1, 0] - elem_mask[0, i, j, 0]) / 2. *side_coef_2
+
+    tmp = {
+        'LU_u_1': y_diag_1 + y_side_1,
+        'LU_u_2': y_diag_2 + y_side_2,
+        'LU_u': y_diag_1 + y_side_1 + y_diag_2 + y_side_2
+    }
+    return tmp
 
 def np_faster_mask_conv(elem_mask, node_resp, coef):
     diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
@@ -131,10 +165,15 @@ def np_faster_mask_conv(elem_mask, node_resp, coef):
                     padded_resp[0, i + 1, j + 1, 0] * diag_coef_diff
                     + (padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
             ) + \
-            (diag_coef_2+diag_coef_2) * \
+            diag_coef_2 * \
             (
                     padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]
                     + padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]
+            ) + \
+            side_coef_2 * \
+            (
+                    padded_resp[0, i - 1, j - 1, 0] + padded_resp[0, i - 1, j + 1, 0]
+                    + padded_resp[0, i + 1, j - 1, 0] + padded_resp[0, i + 1, j + 1, 0]
             )
             conv_result = np.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else np.concatenate([conv_result, np.reshape(conv_result_i_j, (1, 1))], axis=0)
     LU_u = np.reshape(conv_result, (node_resp.shape))
