@@ -6,7 +6,7 @@ Hope Yao @2018.05.09
 
 import numpy as np
 
-def np_get_D_matrix(elem_mask, conductivity_1, conductivity_2):
+def np_get_D_matrix(elem_mask, coef_dict):
     '''
 
     :param elem_mask:
@@ -14,14 +14,15 @@ def np_get_D_matrix(elem_mask, conductivity_1, conductivity_2):
     :param conductivity_2:
     :return:
     '''
+    conductivity_1, conductivity_2 = coef_dict['conductivity_1'], coef_dict['conductivity_2']
     # convolution with symmetric padding at boundary
     from scipy import signal
     elem_mask = np.squeeze(elem_mask)
     node_filter = np.asarray([[1 / 4.] * 2] * 2)
     # first material phase
-    node_mask_1 = signal.correlate2d(elem_mask, node_filter, boundary='fill')
+    node_mask_1 = signal.correlate2d(elem_mask, node_filter, boundary='symm')
     # second material phase
-    node_mask_2 = signal.correlate2d(np.ones_like(elem_mask) - elem_mask, node_filter, boundary='fill')
+    node_mask_2 = signal.correlate2d(np.ones_like(elem_mask) - elem_mask, node_filter, boundary='symm')
     d_matrix = node_mask_1 * conductivity_1*(-8./3.) + node_mask_2 * conductivity_2*(-8./3.)
     return np.expand_dims(np.expand_dims(d_matrix,0),3)
 
@@ -182,6 +183,54 @@ def np_faster_mask_conv(elem_mask, node_resp, coef):
     }
     return tmp
 
+
+def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
+    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
+    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
+    diag_coef_diff = diag_coef_1 - diag_coef_2
+    side_coef_diff = side_coef_1 - side_coef_2
+    padded_resp = np.pad(node_resp, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
+    padded_mask = np.pad(elem_mask, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
+    for i in range(1, padded_resp.shape[1]-1, 1):
+        for j in range(1, padded_resp.shape[1]-1, 1):
+            conv_result_i_j = \
+            padded_mask[0, i - 1, j - 1, 0] * \
+            (
+                    padded_resp[0, i - 1, j - 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i - 1, j, 0] * \
+            (
+                    padded_resp[0, i - 1, j + 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j + 1, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i, j - 1, 0] * \
+            (
+                    padded_resp[0, i + 1, j - 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i, j - 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
+            ) + \
+            padded_mask[0, i, j, 0] * \
+            (
+                    padded_resp[0, i + 1, j + 1, 0] * diag_coef_diff
+                    + (padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
+            ) + \
+            diag_coef_2 * \
+            (
+                    padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]
+                    + padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]
+            ) + \
+            side_coef_2 * \
+            (
+                    padded_resp[0, i - 1, j - 1, 0] + padded_resp[0, i - 1, j + 1, 0]
+                    + padded_resp[0, i + 1, j - 1, 0] + padded_resp[0, i + 1, j + 1, 0]
+            )
+            conv_result = np.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else np.concatenate([conv_result, np.reshape(conv_result_i_j, (1, 1))], axis=0)
+    LU_u = np.reshape(conv_result, (node_resp.shape))
+    tmp = {
+        'LU_u': LU_u
+    }
+    return tmp
+
 if __name__ == '__main__':
     from data_loader import load_data_elem
     resp_gt, load_gt, elem_mask, conductivity_1, conductivity_2 = load_data_elem(case=0)
@@ -208,7 +257,7 @@ if __name__ == '__main__':
     elif method == 'faster':
         load_pred_1 = np_faster_mask_conv(elem_mask, resp_gt, coef_dict)
 
-    d_matrix = np_get_D_matrix(elem_mask, conductivity_1, conductivity_2)
+    d_matrix = np_get_D_matrix(elem_mask, coef_dict)
     load_pred_2 = d_matrix * resp_gt
     load_pred = load_pred_1['LU_u'] + load_pred_2
     import matplotlib.pyplot as plt

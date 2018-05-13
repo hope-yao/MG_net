@@ -87,6 +87,24 @@ def church_plt(pred_res, axis_range, fn=None):
 
     plt.savefig(fn)
 
+def get_animation():
+    import matplotlib.pyplot as plt
+    import numpy as np
+    data_dir = './data/heat_transfer_2phase'
+    u_hist = np.load(data_dir+'/jacobi_net_sol.npy')
+    import imageio
+    images = []
+    for i in range(0, 10000, 100):
+        plt.figure()
+        plt.imshow(u_hist[i], cmap='jet')
+        plt.colorbar()
+        plt.grid('off')
+        filename = data_dir+'/itr_{}'.format(i)
+        plt.title(filename)
+        plt.savefig(filename)
+        images.append(imageio.imread(filename+'.png'))
+    imageio.mimsave(data_dir+'/jacobi.gif', images)
+    plt.close('all')
 
 # import matplotlib.pyplot as plt
 # import seaborn as sns
