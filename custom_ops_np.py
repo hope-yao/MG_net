@@ -183,54 +183,6 @@ def np_faster_mask_conv(elem_mask, node_resp, coef):
     }
     return tmp
 
-
-def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
-    diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
-    diag_coef_2, side_coef_2 = coef['diag_coef_2'], coef['diag_coef_2']
-    diag_coef_diff = diag_coef_1 - diag_coef_2
-    side_coef_diff = side_coef_1 - side_coef_2
-    padded_resp = np.pad(node_resp, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
-    padded_mask = np.pad(elem_mask, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
-    for i in range(1, padded_resp.shape[1]-1, 1):
-        for j in range(1, padded_resp.shape[1]-1, 1):
-            conv_result_i_j = \
-            padded_mask[0, i - 1, j - 1, 0] * \
-            (
-                    padded_resp[0, i - 1, j - 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i - 1, j, 0] * \
-            (
-                    padded_resp[0, i - 1, j + 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j + 1, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i, j - 1, 0] * \
-            (
-                    padded_resp[0, i + 1, j - 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i, j - 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
-            ) + \
-            padded_mask[0, i, j, 0] * \
-            (
-                    padded_resp[0, i + 1, j + 1, 0] * diag_coef_diff
-                    + (padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]) / 2. * side_coef_diff
-            ) + \
-            diag_coef_2 * \
-            (
-                    padded_resp[0, i - 1, j, 0] + padded_resp[0, i, j - 1, 0]
-                    + padded_resp[0, i, j + 1, 0] + padded_resp[0, i + 1, j, 0]
-            ) + \
-            side_coef_2 * \
-            (
-                    padded_resp[0, i - 1, j - 1, 0] + padded_resp[0, i - 1, j + 1, 0]
-                    + padded_resp[0, i + 1, j - 1, 0] + padded_resp[0, i + 1, j + 1, 0]
-            )
-            conv_result = np.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else np.concatenate([conv_result, np.reshape(conv_result_i_j, (1, 1))], axis=0)
-    LU_u = np.reshape(conv_result, (node_resp.shape))
-    tmp = {
-        'LU_u': LU_u
-    }
-    return tmp
-
 if __name__ == '__main__':
     from data_loader import load_data_elem
     resp_gt, load_gt, elem_mask, conductivity_1, conductivity_2 = load_data_elem(case=0)
