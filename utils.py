@@ -87,7 +87,7 @@ def church_plt(pred_res, axis_range, fn=None):
 
     plt.savefig(fn)
 
-def get_animation():
+def get_animation_heat():
     import matplotlib.pyplot as plt
     import numpy as np
     data_dir = './data/heat_transfer_2phase'
@@ -105,6 +105,16 @@ def get_animation():
         images.append(imageio.imread(filename+'.png'))
     imageio.mimsave(data_dir+'/jacobi.gif', images)
     plt.close('all')
+
+def get_animation_elast():
+    import matplotlib.pyplot as plt
+    import scipy.io as sio
+    ux = sio.loadmat('./data/linear_elast_2phase/displacement_x_Steel_Al.mat')['u1']
+    uy = sio.loadmat('./data/linear_elast_2phase/displacement_y_Steel_Al.mat')['u1']
+    plt.figure()
+    plt.imshow(ux)
+    plt.figure()
+    plt.imshow(uy)
 
 # import matplotlib.pyplot as plt
 # import seaborn as sns

@@ -13,10 +13,11 @@ def jacobi_itr(u_input, f_input, d_matrix, elem_mask, coef):
 
 
 def main():
-    resp_gt, load_gt, elem_mask, conductivity_1, conductivity_2 = load_data_elem(case=0)
+    resp_gt, load_gt, elem_mask, coef_dict_data = load_data_elem(case=0)
     load_gt = np.expand_dims(np.expand_dims(load_gt,0),3)
     resp_gt = np.expand_dims(np.expand_dims(resp_gt,0),3)
     elem_mask = np.expand_dims(np.expand_dims(elem_mask,0),3)
+    conductivity_1, conductivity_2 = coef_dict_data['conductivity_1'], coef_dict_data['conductivity_2']
     coef_dict = {
         'conductivity_1': conductivity_1,
         'conductivity_2': conductivity_2,
@@ -29,7 +30,7 @@ def main():
 
     d_matrix = get_D_matrix(elem_mask, coef_dict)
 
-    n_itr = 10000
+    n_itr = 30000
     u_hist = [np.zeros_like(resp_gt)]
     LU_u_hist = []
     loss_hist = []
