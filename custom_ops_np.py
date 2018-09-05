@@ -196,7 +196,7 @@ def np_faster_mask_conv(elem_mask, node_resp, coef):
     weight[-1,:] /= 2
     weight[:,0] /= 2
     weight[:,-1] /= 2
-    LU_u = np.reshape(conv_result, (node_resp.shape))
+    LU_u = np.reshape(conv_result* weight, (node_resp.shape))
     tmp = {
         'LU_u': LU_u
     }

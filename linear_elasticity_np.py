@@ -28,6 +28,10 @@ def np_get_D_matrix_elast(elem_mask, coef_dict, mode='symm'):
     return d_matrix
 
 def sym_padding(x):
+    # x[:, 0, 0, :] *= 4
+    # x[:, 0, -1, :] *= 4
+    # x[:, -1, 0, :] *= 4
+    # x[:, -1, -1, :] *= 4
     left = x[:, :, 1:2, :]
     right = x[:, :, -2:-1, :]
     upper = np.concatenate([x[:, 1:2, 1:2, :], x[:, 1:2, :, :], x[:, 1:2, -2:-1, :]], 2)
@@ -51,8 +55,8 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
 
     node_resp_x = node_resp[:,:,:,:1]
     node_resp_y = node_resp[:,:,:,1:]
-    # padded_resp_x = np.pad(node_resp_x, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")#constant
-    # padded_resp_y = np.pad(node_resp_y, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
+    zero_padded_resp_x = np.pad(node_resp_x, ((0, 0), (1, 1), (1, 1), (0, 0)), "constant")#constant
+    zero_padded_resp_y = np.pad(node_resp_y, ((0, 0), (1, 1), (1, 1), (0, 0)), "constant")
     padded_resp_x = sym_padding(node_resp_x)
     padded_resp_y = sym_padding(node_resp_y)
     padded_mask = np.pad(elem_mask, ((0, 0), (1, 1), (1, 1), (0, 0)), "symmetric")
@@ -85,8 +89,8 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
             ) + \
             coupling_coef_diff * \
             (
-                    padded_resp_y[0, i - 1, j - 1, 0] - padded_resp_y[0, i - 1, j + 1, 0]
-                    - padded_resp_y[0, i + 1, j - 1, 0] + padded_resp_y[0, i + 1, j + 1, 0]
+                    zero_padded_resp_y[0, i - 1, j - 1, 0] - zero_padded_resp_y[0, i - 1, j + 1, 0]
+                    - zero_padded_resp_y[0, i + 1, j - 1, 0] + zero_padded_resp_y[0, i + 1, j + 1, 0]
             ) + \
             diag_coef_2 * \
             (
@@ -104,8 +108,8 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
             ) + \
             coupling_coef_2 * \
             (
-                    padded_resp_y[0, i - 1, j - 1, 0] - padded_resp_y[0, i - 1, j + 1, 0]
-                    - padded_resp_y[0, i + 1, j - 1, 0] + padded_resp_y[0, i + 1, j + 1, 0]
+                    zero_padded_resp_y[0, i - 1, j - 1, 0] - zero_padded_resp_y[0, i - 1, j + 1, 0]
+                    - zero_padded_resp_y[0, i + 1, j - 1, 0] + zero_padded_resp_y[0, i + 1, j + 1, 0]
             )
             # response in x direction
 
@@ -140,8 +144,8 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
                 ) + \
                 coupling_coef_diff * \
                 (
-                        padded_resp_x[0, i - 1, j - 1, 0] - padded_resp_x[0, i - 1, j + 1, 0]
-                        - padded_resp_x[0, i + 1, j - 1, 0] + padded_resp_x[0, i + 1, j + 1, 0]
+                        zero_padded_resp_x[0, i - 1, j - 1, 0] - zero_padded_resp_x[0, i - 1, j + 1, 0]
+                        - zero_padded_resp_x[0, i + 1, j - 1, 0] + zero_padded_resp_x[0, i + 1, j + 1, 0]
                 ) + \
                 diag_coef_2 * \
                 (
@@ -158,8 +162,8 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
                 ) + \
                 coupling_coef_2 * \
                 (
-                        padded_resp_x[0, i - 1, j - 1, 0] - padded_resp_x[0, i - 1, j + 1, 0]
-                        - padded_resp_x[0, i + 1, j - 1, 0] + padded_resp_x[0, i + 1, j + 1, 0]
+                        zero_padded_resp_x[0, i - 1, j - 1, 0] - zero_padded_resp_x[0, i - 1, j + 1, 0]
+                        - zero_padded_resp_x[0, i + 1, j - 1, 0] + zero_padded_resp_x[0, i + 1, j + 1, 0]
                 )
             conv_result_y = np.reshape(conv_result_y_i_j, (1, 1)) if i == 1 and j == 1 \
                 else np.concatenate([conv_result_y, np.reshape(conv_result_y_i_j, (1, 1))], axis=0)
@@ -167,8 +171,13 @@ def np_faster_mask_conv_elast(elem_mask, node_resp, coef):
     LU_u_x = np.reshape(conv_result_x, (node_resp_x.shape))
     LU_u_y = np.reshape(conv_result_y, (node_resp_y.shape))
     LU_u = np.concatenate([LU_u_x,LU_u_y],3)
+    weight = np.ones_like(LU_u)
+    # weight[:, 0, :, :] /= 2
+    # weight[:, -1, :, :] /= 2
+    # weight[:, :, 0, :] /= 2
+    # weight[:, :, -1, :] /= 2
     tmp = {
-        'LU_u': LU_u,
+        'LU_u': LU_u*weight,
     }
     return tmp
 
@@ -192,7 +201,7 @@ def get_w_matrix(E, mu):
         [-4*(1 - mu / 3.),        16 * mu / 3.,             -4*(1 - mu / 3.)],
     ])
 
-    wxy = wyx = cost_coef * np.asarray([
+    wxy = wyx = cost_coef*4 * np.asarray([
         [2 * (mu + 1),        0,             -2 * (mu + 1)],
         [0,                        0,                  0],
         [-2 * (mu + 1),        0,             2 * (mu + 1)],

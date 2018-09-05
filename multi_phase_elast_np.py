@@ -2,9 +2,17 @@ import numpy as np
 from linear_elasticity_np import np_faster_mask_conv_elast as masked_conv
 
 def jacobi_itr_elast(u_input, f_input, d_matrix, elem_mask, coef):
+    u_input_copy = np.copy(u_input)
+
+    weight = np.ones_like(f_input)
+    weight[:, 0, :, :] /= 2
+    weight[:, -1, :, :] /= 2
+    weight[:, :, 0, :] /= 2
+    weight[:, :, -1, :] /= 2
 
     LU_u = masked_conv(elem_mask, u_input, coef)
-    u_new = (u_input - 0.9*LU_u['LU_u']/ d_matrix) + 0.9*f_input/d_matrix
+    u_new = (0.1*u_input - 0.9*LU_u['LU_u']/ d_matrix) + 0.9*f_input/d_matrix
+    u_new = 0.9 * (f_input-LU_u['LU_u']*weight) / (d_matrix*weight) + 0.1 * u_input_copy
     # u_new = np.concatenate([np.pad(u_new[:,:,1:,0:1], ((0, 0), (0, 0), (1, 0), (0, 0)),"constant"),
     #                         u_new[:, :, :, 1:2]],3)  # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
     u_new = np.pad(u_new[:,:,1:,:], ((0, 0), (0, 0), (1, 0), (0, 0)),"constant")  # Dirc BC, MUST BE ENFORCED AT EVERY CONV ITERATION!
