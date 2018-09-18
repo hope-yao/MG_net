@@ -1,5 +1,5 @@
 import numpy as np
-from custom_ops_np import np_faster_mask_conv as masked_conv
+from custom_ops_np import np_faster_mask_conv_correct as masked_conv
 from custom_ops_np import np_get_D_matrix as get_D_matrix
 from data_loader import load_data_elem
 

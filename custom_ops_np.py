@@ -191,6 +191,7 @@ def np_faster_mask_conv(elem_mask, node_resp, coef):
                     + padded_resp[0, i + 1, j - 1, 0] + padded_resp[0, i + 1, j + 1, 0]
             )
             conv_result = np.reshape(conv_result_i_j, (1, 1)) if i == 1 and j == 1 else np.concatenate([conv_result, np.reshape(conv_result_i_j, (1, 1))], axis=0)
+    conv_result = np.reshape(conv_result, (node_resp.shape))
     weight = np.ones_like(conv_result)
     weight[0,:] /= 2
     weight[-1,:] /= 2
@@ -241,7 +242,7 @@ if __name__ == '__main__':
     plt.imshow(np.squeeze(load_pred)[:,1:-1], interpolation='None')
     plt.colorbar()
     plt.figure()
-    plt.imshow(np.squeeze(resp_gt), interpolation='None')
+    plt.imshow(np.squeeze(resp_gt)[:,1:-1], interpolation='None')
     plt.colorbar()
     plt.show()
     print('done')
