@@ -10,7 +10,7 @@ def load_data_elem(case):
             # u = np.zeros((66, 66), 'float32')
             u = sio.loadmat('/home/hope-yao/Downloads/steel_U.mat')['U1'][0][1:-1, 1:-1]
             f = sio.loadmat('/home/hope-yao/Downloads/steel_q.mat')['F1'][0][1:-1,1:-1]
-            mask_1 = np.asarray([[1., ] * 43 + [0.] * 20] * 63, dtype='float32')
+            mask_1 = np.asarray([[1., ] * 43 + [1.] * 20] * 63, dtype='float32')
             conductivity_1 = np.float32(16.)
             conductivity_2 = np.float32(16.)
         elif case == -1:
@@ -46,8 +46,6 @@ def load_data_elem(case):
         }
     return u, f, mask_1, coef_dict
 
-
-
 def get_D_matrix(elem_mask, coef_dict):
     '''
 
@@ -67,7 +65,6 @@ def get_D_matrix(elem_mask, coef_dict):
     node_mask_2 = signal.correlate2d(np.ones_like(elem_mask) - elem_mask, node_filter, boundary='symm')
     d_matrix = node_mask_1 * conductivity_1*(-8./3.) + node_mask_2 * conductivity_2*(-8./3.)
     return np.expand_dims(np.expand_dims(d_matrix,0),3)
-
 
 def masked_conv(elem_mask_orig, node_resp, coef):
     diag_coef_1, side_coef_1 = coef['diag_coef_1'], coef['diag_coef_1']
