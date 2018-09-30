@@ -1,6 +1,9 @@
 import numpy as np
 import scipy.io as sio
 from scipy import signal
+from timeit import default_timer as timer
+
+start = timer()
 
 def load_data_elem():
     '''loading data obtained from FEA simulation'''
@@ -37,6 +40,8 @@ def main():
         loss_hist += [loss_i]
         print('n_itr: {}, loss: {}'.format(i,loss_i))
 
+    end = timer()
+    print(end - start) # Time in seconds
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(loss_hist)
