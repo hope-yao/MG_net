@@ -7,9 +7,9 @@ start = timer()
 
 def load_data_elem():
     '''loading data obtained from FEA simulation'''
-    data = sio.loadmat('./data/heat_transfer_1phase/matrix.mat')
-    f = data['matrix'][0][0][1]
-    A = data['matrix'][0][0][0]
+    data = sio.loadmat('./data/heat_transfer_1phase/matrix1.mat')
+    f = data['matrix1'][0][0][1]
+    A = data['matrix1'][0][0][0]
     u = np.linalg.solve(A, f)
     u = u.reshape(66,68)
     f = f.reshape(66,68)
