@@ -22,13 +22,13 @@ def conjgrad(A, b, tol, x=None):
     return x
 
 if __name__ == '__main__':
-    data = sio.loadmat('./data/heat_transfer_1phase/matrix2.mat')
-    b = data['matrix2'][0][0][1]
-    A = data['matrix2'][0][0][0]
-    #A = np.array([[5., 2.],[2., 3.]])
-    #b = np.array([-2., 4.])
+    #data = sio.loadmat('./data/heat_transfer_1phase/matrix2.mat', matlab_compatible)
+    #b = data['matrix2'][0][0][1]
+    #A = data['matrix2'][0][0][0]
+    A = np.array([[4., 1.],[1., 3.]])
+    b = np.array([1., 2.])
     tol = 1e-5
     print(b)
     print(A)
     x = conjgrad(A, b, tol)
-    u = np.linalg.solve(A, b)
+    x_test = np.linalg.solve(A, b)
