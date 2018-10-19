@@ -42,6 +42,7 @@ def main():
 
     end = timer()
     print(end - start) # Time in seconds
+    print(u_hist)
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(loss_hist)
