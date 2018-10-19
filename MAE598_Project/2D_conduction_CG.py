@@ -20,13 +20,16 @@ def conjgrad(A, b, tol, x):
     return x
 
 if __name__ == '__main__':
-    data1 = sio.loadmat('./data/heat_transfer_1phase/K_Forceboundary.mat')
-    data2 = sio.loadmat('./data/heat_transfer_1phase/f_forceboundary.mat')
+    #data1 = sio.loadmat('./data/heat_transfer_1phase/K_Forceboundary.mat')
+    #data2 = sio.loadmat('./data/heat_transfer_1phase/f_forceboundary.mat')
     #A = data1['K_Forceboundary']
     #b = data2['f_forceboundary']
 
+    # Toy matrix
     A = np.array([[4., 1.],[1., 3.]])
     b = np.array([[1.], [2.]])
+
+    # 4x4 node matrix from K matlab code
     bb = np.array([[-0.295], [0], [0], [0.295], [-0.295], [0], [0], [0.295], [-0.295], [0], [0], [0.295], [-0.295], [0], [0], [0.295]])
     AA = np.array([[10.6666666666667, -2.66666666666667, 0, 0, -2.66666666666667, -5.33333333333333, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                   [-2.66666666666667, 21.3333333333333, -2.66666666666667, 0, -5.33333333333333, -5.33333333333334, -5.33333333333333, 0, 0, 0, 0, 0, 0, 0, 0, 0],
