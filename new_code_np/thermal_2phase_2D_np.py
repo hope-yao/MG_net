@@ -159,9 +159,9 @@ def apply(u_input, f, mask, coef):
     padded_mask = boundary_padding(mask) # for boundary consideration
     #LU_u = signal.correlate2d(padded_input, heat_filter, mode='valid') # perform convolution
     conv_res = masked_conv(padded_mask, padded_input, coef)
-    LU_u = conv_res['LU_u']
-    LU_u_bc = boundary_correct(LU_u)
-    u = (f - LU_u_bc) / coef['d_matrix'] # jacobi formulation of linear system of equation solver
+    R_u = conv_res['LU_u']
+    R_u_bc = boundary_correct(R_u)
+    u = (f - R_u_bc) / coef['d_matrix'] # jacobi formulation of linear system of equation solver
     return u
 
 def save_gif(u_hist, data_dir):
@@ -184,6 +184,46 @@ def save_gif(u_hist, data_dir):
     plt.close('all')
 
 
+def visualize(loss_hist, resp_pred, resp_gt):
+    import matplotlib.pyplot as plt
+    BIGGER_SIZE = 16
+    plt.rc('font', size=BIGGER_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    plt.figure()
+    plt.semilogy(loss_hist, 'b-', label='convergence')
+    plt.semilogy([1, len(loss_hist)], [1, len(loss_hist) ** -0.3], 'k--', label='$O(n^{-0.3})$')
+    plt.semilogy([1, len(loss_hist)], [1, len(loss_hist) ** -0.5], 'k--', label='$O(n^{-0.5})$')
+    plt.legend()
+    plt.xlabel('network depth')
+    plt.ylabel('prediction error')
+    BIGGER_SIZE = 12
+    plt.rc('font', size=BIGGER_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.imshow(resp_pred, cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(1,3,2)
+    plt.imshow(resp_gt, cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(1,3,3)
+    plt.imshow(resp_pred-resp_gt, cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.show()
+
 def main():
     resp_gt, load_gt, mask, coef = load_data_elem()
 
@@ -192,22 +232,12 @@ def main():
     for i in range(500000):
         u_new = apply(u_hist[-1], load_gt, mask, coef)
         u_hist += [u_new]
-        loss_i = np.mean(np.abs(u_hist[i] - resp_gt))
+        loss_i = np.linalg.norm(u_hist[i] - resp_gt)/np.linalg.norm(resp_gt)
         loss_hist += [loss_i]
         print('n_itr: {}, loss: {}'.format(i,loss_i))
 
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(loss_hist)
-    plt.figure()
-    plt.imshow(u_hist[-1][1:-1, 1:-1], cmap='jet')
-    plt.colorbar()
-    plt.grid('off')
-    plt.figure()
-    plt.imshow(resp_gt[1:-1, 1:-1], cmap='jet')
-    plt.colorbar()
-    plt.grid('off')
-    plt.show()
+    visualize(loss_hist, u_hist[-1], resp_gt)
+
     return u_hist
 
 if __name__ == '__main__':

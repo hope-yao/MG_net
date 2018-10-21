@@ -13,15 +13,15 @@ def reference_jacobi_solver(A, f):
     u = np.zeros_like(f)
     u_hist = [u]
     u_img_hist = [u.reshape(num_node,num_node,2)]
-    LU_u_img_hist = []
+    R_u_img_hist = []
     n_iter = 100000
     for itr_i in range(n_iter):
-        LU_u = np.matmul(LU, u_hist[-1])
-        u_new = omega * inv_D * (f-LU_u) + (1-omega)*u_hist[-1]
+        R_u = np.matmul(LU, u_hist[-1])
+        u_new = omega * inv_D * (f-R_u) + (1-omega)*u_hist[-1]
 
-        LU_u_x = np.asarray([LU_u[2 * i] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
-        LU_u_y = np.asarray([LU_u[2 * i + 1] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
-        LU_u_img = np.stack([LU_u_x, LU_u_y], -1)
+        R_u_x = np.asarray([R_u[2 * i] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
+        R_u_y = np.asarray([R_u[2 * i + 1] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
+        R_u_img = np.stack([R_u_x, R_u_y], -1)
         u_new_x = np.asarray([u_new[2 * i] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
         u_new_y = np.asarray([u_new[2 * i + 1] for i in range(65 ** 2)]).reshape(65, 65).transpose((1, 0))
         u_new_img = np.stack([u_new_x, u_new_y], -1)
@@ -31,11 +31,11 @@ def reference_jacobi_solver(A, f):
 
         u_hist += [u_new]
         u_img_hist += [u_new_img]
-        LU_u_img_hist += [LU_u_img]
+        R_u_img_hist += [R_u_img]
 
     res = {
         'u_hist' : np.asarray(u_img_hist),
-        'LU_u_hist' : np.asarray(LU_u_img_hist)
+        'R_u_hist' : np.asarray(R_u_img_hist)
     }
     return res
 
@@ -85,9 +85,9 @@ def get_w_matrix(coef_dict):
     ])
 
     wxy = wyx = cost_coef * np.asarray([
-        [2 * (mu + 1),        0,             -2 * (mu + 1)],
-        [0,                        0,                  0],
         [-2 * (mu + 1),        0,             2 * (mu + 1)],
+        [0,                        0,                  0],
+        [2 * (mu + 1),        0,             -2 * (mu + 1)],
     ])
 
     wyy = cost_coef * np.asarray([
@@ -163,31 +163,75 @@ def apply(u_input, f, coef):
     u = omega * (f - Ru_bc) / coef['d_matrix'] + (1-omega)*u_input# jacobi formulation of linear system of equation solver
     return u
 
+def visualize(loss_hist, resp_pred, resp_gt):
+    import matplotlib.pyplot as plt
+
+    BIGGER_SIZE = 16
+    plt.rc('font', size=BIGGER_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    plt.figure()
+    plt.semilogy(loss_hist, 'b-', label='convergence')
+    plt.semilogy([1, len(loss_hist)], [1, len(loss_hist) ** -1], 'k--', label='$O(n^{-1})$')
+    plt.semilogy([1, len(loss_hist)], [1, len(loss_hist) ** -2], 'k--', label='$O(n^{-2})$')
+    plt.legend()
+    plt.xlabel('network depth')
+    plt.ylabel('prediction error')
+
+    BIGGER_SIZE = 12
+    plt.rc('font', size=BIGGER_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=BIGGER_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=BIGGER_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    plt.figure()
+    plt.subplot(2, 3, 1)
+    plt.imshow(resp_pred[:, :, 0], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(2, 3, 4)
+    plt.imshow(resp_pred[:, :, 1], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(2, 3, 2)
+    plt.imshow(resp_gt[:, :, 0], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(2, 3, 5)
+    plt.imshow(resp_gt[:, :, 1], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(2, 3, 3)
+    plt.imshow(resp_pred[:, :, 0] - resp_gt[:, :, 0], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.subplot(2, 3, 6)
+    plt.imshow(resp_pred[:, :, 1] - resp_gt[:, :, 1], cmap='jet', interpolation='bilinear')
+    plt.colorbar()
+    plt.grid('off')
+    plt.show()
+
 def main():
     resp_gt, load_gt, coef = load_data_elem()
 
     u_hist = [np.zeros((num_node,num_node,2))]
     loss_hist = []
-    for i in range(50000):
+    for i in range(10000):
         u_new = apply(u_hist[-1], load_gt, coef)
         u_hist += [u_new]
-        loss_i = np.mean(np.abs(u_hist[i] - resp_gt))
+        loss_i = np.linalg.norm(u_hist[i] - resp_gt)/np.linalg.norm(resp_gt)
         loss_hist += [loss_i]
         print('n_itr: {}, loss: {}'.format(i,loss_i))
 
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(loss_hist)
-    plt.figure()
-    plt.subplot(1,2,1)
-    plt.imshow(u_hist[-1][:,:,0], cmap='jet')
-    plt.colorbar()
-    plt.grid('off')
-    plt.subplot(1,2,2)
-    plt.imshow(resp_gt[:,:,1], cmap='jet')
-    plt.colorbar()
-    plt.grid('off')
-    plt.show()
+    visualize(loss_hist, u_hist[-1], resp_gt)
     return u_hist
 
 if __name__ == '__main__':
