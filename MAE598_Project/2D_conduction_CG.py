@@ -42,18 +42,9 @@ if __name__ == '__main__':
                   [0, 0, 0, 2, 0, 4, 1, 0],
                   [2, 3, 1, 1, 2, 1, 5, 1],
                   [1, 0, 2, 1, 1, 0, 1, 3]])
-
-    tol = 1e-5
-    print("A = ", A)
-    print("b = ", b)
-   # print("AA = ", AA)
-   # print("bb = ", bb)
-
     x = np.array([[0], [0], [0], [0], [0], [0], [0], [0]])
-    #x = np.array([[0], [0]])
+    tol = 1e-5
     x = conjgrad(A, b, tol, x)
     x_test = np.linalg.solve(A, b)
 
-    # xx = conjgrad(AA, bb, tol)
-    # xx_test = np.linalg.solve(AA, bb)
 
