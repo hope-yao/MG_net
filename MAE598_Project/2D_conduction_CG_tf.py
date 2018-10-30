@@ -97,8 +97,14 @@ if __name__ == '__main__':
     b_tf = tf.convert_to_tensor(b, dtype=tf.float32)
     x0_tf = tf.convert_to_tensor(x, dtype=tf.float32)
 
+    FLAGS = tf.app.flags.FLAGS
+    tfconfig = tf.ConfigProto(
+        allow_soft_placement=True,
+        log_device_placement=True,
+    )
+    tfconfig.gpu_options.allow_growth = True
+    sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
-    sess = tf.Session()
     sess.run(init)
 
     start_tf = timer()
