@@ -33,22 +33,25 @@ def convert_sparse_matrix_to_sparse_tensor(X):
 
 
 def conjgrad_tf(A, b, tol, x):
-    n = len(b)
+    n = 100
     #r = b - A.dot(x)
     r = b - tf.sparse_tensor_dense_matmul(A_tf, x, adjoint_a=False, adjoint_b=False, name=None)
     p = r
-    rsold = np.dot(r.T, r)
+    #rsold = np.dot(r.T, r)
+    rsold = tf.matmul(tf.transpose(r), r)
     for i in range(n):
         #Ap = A.dot(p)
         Ap = tf.sparse_tensor_dense_matmul(A_tf, p, adjoint_a=False, adjoint_b=False, name=None)
-        alpha = rsold / np.dot(p.T, Ap)
+        #alpha = rsold / np.dot(p.T, Ap)
+        alpha = rsold / tf.matmul(tf.transpose(p), Ap)
         x = x + alpha * p
         r = r - alpha * Ap
-        rsnew = np.dot(r.T, r)
-        if np.sqrt(rsnew) < tol:
-            print('Itr:', i)
+        #rsnew = np.dot(r.T, r)
+        rsnew = tf.matmul(tf.transpose(r), r)
+        #if tf.sqrt(rsnew) < tol:
+        print('Itr:', i)
             #print(x)
-            break
+            #break
         p = r + (rsnew / rsold) * p
         rsold = rsnew
     return x
@@ -84,7 +87,7 @@ if __name__ == '__main__':
 
     end_py = timer()
 
-    print("Python solved in " + end_py - start_py + " Seconds.")
+    print('Python solved in ', end_py - start_py, ' Seconds.')
 
     # Test Solutions
 
@@ -93,23 +96,28 @@ if __name__ == '__main__':
 
     # Tensorflow
 
-    A_tf = convert_sparse_matrix_to_sparse_tensor(A)
+    A_tensor = convert_sparse_matrix_to_sparse_tensor(A)
+    A_tf = tf.cast(A_tensor, tf.float32)
     b_tf = tf.convert_to_tensor(b, dtype=tf.float32)
     x0_tf = tf.convert_to_tensor(x, dtype=tf.float32)
+
+
 
     FLAGS = tf.app.flags.FLAGS
     tfconfig = tf.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=True,
     )
-    tfconfig.gpu_options.allow_growth = True
+    #tfconfig.gpu_options.allow_growth = True
     sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
+
+
     sess.run(init)
 
     start_tf = timer()
 
-    x_result_tf = conjgrad_tf(A_tf, b_tf, tol, x0)
+    x_result_tf = conjgrad_tf(A_tf, b_tf, tol, x0_tf)
 
     end_tf = timer()
 
