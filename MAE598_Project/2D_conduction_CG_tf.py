@@ -33,7 +33,7 @@ def convert_sparse_matrix_to_sparse_tensor(X):
 
 
 def conjgrad_tf(A, b, tol, x):
-    n = 100
+    n = 268
     #r = b - A.dot(x)
     r = b - tf.sparse_tensor_dense_matmul(A_tf, x, adjoint_a=False, adjoint_b=False, name=None)
     p = r
@@ -120,5 +120,4 @@ if __name__ == '__main__':
     x_result_tf = conjgrad_tf(A_tf, b_tf, tol, x0_tf)
 
     end_tf = timer()
-
     print('Tensorflow solved in ',  end_tf - start_tf, ' Seconds.')
