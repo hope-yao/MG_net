@@ -1,19 +1,19 @@
 
-function [] = heat_demo()    
+tic()   
     nx = 100;              % # of elements along  X- direction.
     ny = 100;              % # of elements along  Y- direction. 
     lx=0.5;              % length in x direction
     ly=0.5;              % length in y direction
-        D = 16 * eye(2);  % Conductivity (W/m-K)
+        D = 16 * eye(2);    % W/m-K
     mesh = uniform_mesh(nx,ny,lx,ly);
-    qbar = 10000;         % Heat flux (leaving domain at bottom).
-    Tbar = 0;             % Prescribed temperature.
+    qbar = 10000;        % Heat flux (leaving domain at bottom).
+    Tbar = 0;          % Prescribed temperature.
     
     qpts = [-1 1 1 -1; -1 -1 1 1]/sqrt(3);   
     
     % Compute conductivity matrix and nodal heat source fluxes.
-     K = spalloc(mesh.num_nodes, mesh.num_nodes, 9*mesh.num_nodes);
-%     K = zeros(mesh.num_nodes, mesh.num_nodes);
+    K = spalloc(mesh.num_nodes, mesh.num_nodes, 9*mesh.num_nodes);
+ %     K = zeros(mesh.num_nodes, mesh.num_nodes);
     f = zeros(mesh.num_nodes, 1);
     for c = mesh.connectivity
         xe = mesh.x(:,c);
@@ -23,13 +23,12 @@ function [] = heat_demo()
             J = xe * dNdp;
             B = dNdp/J;
             Ke = Ke + B * D * B' * det(J);
-            
             x = xe(1,:) * N;
-            f(c) = f(c) + N * 1000*x * det(J);
+%             f(c) = f(c) + N * 1000*x * det(J);
         end
         K(c,c) = K(c,c) + Ke;
     end
-    
+    toc()
       right_side = find(mesh.x(1,:) == lx);
      [~, order] = sort(mesh.x(1, right_side));
     right_side = right_side(order);
@@ -43,50 +42,57 @@ function [] = heat_demo()
         N = [0.5; 0.5];
         f(c) = f(c) + N * qbar * le; % sign changed from - to +
     end
-    
+     
     % Apply essential boundary condition on left edge of domain.
     left_side = find(mesh.x(1,:) == 0);
     
     for i = left_side
-        K(i,:) = 0.0;
-        K(i,i) = 1.0;
+%         K(i,:) = 0.0;
+%         K(i,i) = 1.0;
         f(i) = Tbar;
+        K(i,:) = [];
+        K(:,i) = [];
+        f(i,:)=[];
     end
     % Solve discrete system.
+    toc()
+    % deleting rows
+%     f(10,1)=f(20,1);
     d = K\f;
-    
-    % Plot temperature contours.
-    clf;
-    p.vertices = mesh.x';
-    p.faces = mesh.connectivity';
-    p.facecolor = 'interp';
-    p.facevertexcdata = d;    
-    patch(p)   
-    colorbar
-    
-    % Plot heat fluxes at element centers.
-    qq = [];
-    xx = [];    
-    for c = mesh.connectivity
-        xe = mesh.x(:,c);
-        de = d(c)';
-        [N,dNdp] = shape([0;0]);
-        J = xe * dNdp;
-        B = dNdp / J;
-        qq(end+1, :) = -de * B * D;
-        xx(end+1, :) = xe * N;
-    end
-    hold on;
-    quiver(xx(:,1), xx(:,2), qq(:,1), qq(:,2), 0.50, 'color', 'k');
-%    rank_of_k=rank(K)
-    K_Forceboundary_nodes100x100 = K;
-    f_forceboundary_nodes100x100 = f;
-    x0_nodes100x100 = zeros(length(K),1);
-    save('K_Forceboundary_nodes100x100.mat', 'K_Forceboundary_nodes100x100')
-    save('f_forceboundary_nodes100x100.mat', 'f_forceboundary_nodes100x100')
-    save('x0_nodes100x100.mat', 'x0_nodes100x100')
-  
-end
+    toc()
+%     % Plot temperature contours.
+%     clf;
+%     p.vertices = mesh.x';
+%     p.faces = mesh.connectivity';
+%     p.facecolor = 'interp';
+%     p.facevertexcdata = d;    
+%     patch(p)   
+%     colorbar
+%     
+% %     Plot heat fluxes at element centers.
+%     qq = [];
+%     xx = [];    
+%     for c = mesh.connectivity
+%         xe = mesh.x(:,c);
+%         de = d(c)';
+%         [N,dNdp] = shape([0;0]);
+%         J = xe * dNdp;
+%         B = dNdp / J;
+%         qq(end+1, :) = -de * B * D;
+%         xx(end+1, :) = xe * N;
+%     end
+%     hold on;
+%     quiver(xx(:,1), xx(:,2), qq(:,1), qq(:,2), 0.50, 'color', 'k');
+%     rank_of_k=rank(K)
+    K_forceboundary_elements100x100 = K;
+    f_forceboundary_elements100x100 = f;
+    x0_elements100x100 = zeros(length(K),1);
+    save('K_forceboundary_elements100x100.mat', 'K_forceboundary_elements100x100')
+    save('f_forceboundary_elements100x100.mat', 'f_forceboundary_elements100x100')
+    save('x0_elements100x100.mat', 'x0_elements100x100')
+  toc()
+
+
 
 
 % Creates a unifom mesh of ex by ey elements

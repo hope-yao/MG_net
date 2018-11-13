@@ -3,37 +3,12 @@ import scipy.io as sio
 from timeit import default_timer as timer
 import tensorflow as tf
 
-
-def conjgrad_py(A, b, tol, x):
-    n = len(b)
-    r = b - A.dot(x)
-    # r = b - np.dot(A, x)
-    p = r
-    rsold = np.dot(r.T, r)
-    for i in range(n):
-        Ap = A.dot(p)
-        # Ap = np.dot(A, p)
-        alpha = rsold / np.dot(p.T, Ap)
-        x = x + alpha * p
-        r = r - alpha * Ap
-        rsnew = np.dot(r.T, r)
-        if np.sqrt(rsnew) < tol:
-            print('Itr:', i)
-            print(x)
-            break
-        p = r + (rsnew / rsold) * p
-        rsold = rsnew
-    return x
-
-
 def convert_sparse_matrix_to_sparse_tensor(X):
     coo = X.tocoo()
     indices = np.mat([coo.row, coo.col]).transpose()
     return tf.SparseTensor(indices, coo.data, coo.shape)
 
-
-def conjgrad_tf(A, b, tol, x):
-    n = 268
+def conjgrad_tf(A_tf, b, x, n):
     #r = b - A.dot(x)
     r = b - tf.sparse_tensor_dense_matmul(A_tf, x, adjoint_a=False, adjoint_b=False, name=None)
     p = r
@@ -48,59 +23,51 @@ def conjgrad_tf(A, b, tol, x):
         r = r - alpha * Ap
         #rsnew = np.dot(r.T, r)
         rsnew = tf.matmul(tf.transpose(r), r)
-        #if tf.sqrt(rsnew) < tol:
-        print('Itr:', i)
-            #print(x)
-            #break
+        #print('Itr:', i)
         p = r + (rsnew / rsold) * p
         rsold = rsnew
     return x
 
 
 if __name__ == '__main__':
-    data1 = sio.loadmat('./data/100x100/K_Forceboundary_nodes100x100.mat')
-    data2 = sio.loadmat('./data/100x100/f_forceboundary_nodes100x100.mat')
-    data3 = sio.loadmat('./data/100x100/x0_nodes100x100.mat')
-    A = data1['K_Forceboundary_nodes100x100']
-    # AA = A.toarray()
-    b = data2['f_forceboundary_nodes100x100']
-    x = data3['x0_nodes100x100']
 
-    # Toy Test Matrix A = 8x8
-    b_test = np.array([[1], [1], [1], [1], [1], [1], [1], [1]])
-    A_test = np.array([[6, 0, 1, 2, 0, 0, 2, 1],
-                       [0, 5, 1, 1, 0, 0, 3, 0],
-                       [1, 1, 6, 1, 2, 0, 1, 2],
-                       [2, 1, 1, 7, 1, 2, 1, 1],
-                       [0, 0, 2, 1, 6, 0, 2, 1],
-                       [0, 0, 0, 2, 0, 4, 1, 0],
-                       [2, 3, 1, 1, 2, 1, 5, 1],
-                       [1, 0, 2, 1, 1, 0, 1, 3]])
-    x_test = np.array([[0], [0], [0], [0], [0], [0], [0], [0]])
 
-    # Tolerance: Decrease for grater accuracy
-    tol = 1e-5
+    # 10 x 10 Element Data
+    data1 = sio.loadmat('./data/10x10/K_forceboundary_elements10x10.mat')
+    data2 = sio.loadmat('./data/10x10/f_forceboundary_elements10x10.mat')
+    data3 = sio.loadmat('./data/10x10/x0_elements10x10.mat')
+    A10 = data1['K_forceboundary_elements10x10']
+    b10 = data2['f_forceboundary_elements10x10']
+    x10 = data3['x0_elements10x10']
+    A_tensor = convert_sparse_matrix_to_sparse_tensor(A10)
+    A_tf10 = tf.cast(A_tensor, tf.float32)
+    b_tf10 = tf.convert_to_tensor(b10, dtype=tf.float32)
+    x0_tf10 = tf.convert_to_tensor(x10, dtype=tf.float32)
 
-    start_py = timer()
 
-    x_result_py = conjgrad_py(A, b, tol, x)
+    # 100 x 100 Element Data
+    data4 = sio.loadmat('./data/100x100/K_forceboundary_elements100x100.mat')
+    data5 = sio.loadmat('./data/100x100/f_forceboundary_elements100x100.mat')
+    data6 = sio.loadmat('./data/100x100/x0_elements100x100.mat')
+    A100 = data4['K_forceboundary_elements100x100']
+    b100 = data5['f_forceboundary_elements100x100']
+    x100 = data6['x0_elements100x100']
+    A_tensor = convert_sparse_matrix_to_sparse_tensor(A100)
+    A_tf100 = tf.cast(A_tensor, tf.float32)
+    b_tf100 = tf.convert_to_tensor(b100, dtype=tf.float32)
+    x0_tf100 = tf.convert_to_tensor(x100, dtype=tf.float32)
 
-    end_py = timer()
-
-    print('Python solved in ', end_py - start_py, ' Seconds.')
-
-    # Test Solutions
-
-    # x_test = conjgrad(A, b, tol, x_test)
-    # x_linalg = np.linalg.solve(AA, b)
-
-    # Tensorflow
-
-    A_tensor = convert_sparse_matrix_to_sparse_tensor(A)
-    A_tf = tf.cast(A_tensor, tf.float32)
-    b_tf = tf.convert_to_tensor(b, dtype=tf.float32)
-    x0_tf = tf.convert_to_tensor(x, dtype=tf.float32)
-
+    # # 1000 x 1000 Element Data
+    # data7 = sio.loadmat('./data/1000x1000/K_forceboundary_elements1000x1000.mat')
+    # data8 = sio.loadmat('./data/1000x1000/f_forceboundary_elements1000x1000.mat')
+    # data9 = sio.loadmat('./data/1000x1000/x0_elements1000x1000.mat')
+    # A1000 = data7['K_forceboundary_elements1000x1000']
+    # b1000 = data8['f_forceboundary_elements1000x1000']
+    # x1000 = data9['x0_elements100x1000']
+    # A_tensor = convert_sparse_matrix_to_sparse_tensor(A100)
+    # A_tf1000 = tf.cast(A_tensor, tf.float32)
+    # b_tf1000 = tf.convert_to_tensor(b1000, dtype=tf.float32)
+    # x0_tf1000 = tf.convert_to_tensor(x1000, dtype=tf.float32)
 
 
     FLAGS = tf.app.flags.FLAGS
@@ -111,13 +78,25 @@ if __name__ == '__main__':
     #tfconfig.gpu_options.allow_growth = True
     sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
-
-
     sess.run(init)
 
-    start_tf = timer()
+    # 10 x 10 Elements
+    n10 = 36    # Based on # of python iterations
+    start_tf10 = timer()
+    x_result_tf10 = conjgrad_tf(A_tf10, b_tf10, x0_tf10, n10)
+    end_tf10 = timer()
+    print('Tensorflow solved for 10 element case in ',  end_tf10 - start_tf10, ' Seconds.')
 
-    x_result_tf = conjgrad_tf(A_tf, b_tf, tol, x0_tf)
+    # 100 x 100 Elements
+    n100 = 313  # Based on # of python iterations
+    start_tf100 = timer()
+    x_result_tf100 = conjgrad_tf(A_tf100, b_tf100, x0_tf100, n100)
+    end_tf100 = timer()
+    print('Tensorflow solved for 100 element case in ', end_tf100 - start_tf100, ' Seconds.')
 
-    end_tf = timer()
-    print('Tensorflow solved in ',  end_tf - start_tf, ' Seconds.')
+    # # 1000 x 1000 Elements
+    # n1000 =   # Based on # of python iterations
+    # start_tf1000 = timer()
+    # x_result_tf1000 = conjgrad_tf(A_tf1000, b_tf1000, x0_tf1000, n1000)
+    # end_tf1000 = timer()
+    # print('Tensorflow solved for 1000 element case in ', end_tf1000 - start_tf1000, ' Seconds.')
