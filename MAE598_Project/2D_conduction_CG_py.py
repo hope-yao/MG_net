@@ -33,7 +33,7 @@ if __name__ == '__main__':
     b10 = data2['f_forceboundary_elements10x10']
     x10 = data3['x0_elements10x10']
     start_py10 = timer()
-    x100_result_py = conjgrad(A10, b10, tol, x10)
+    x10_result_py = conjgrad(A10, b10, tol, x10)
     end_py10 = timer()
     print('Python solved for 10 element case in ',  end_py10 - start_py10, ' Seconds.')
 

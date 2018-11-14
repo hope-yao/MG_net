@@ -57,17 +57,17 @@ if __name__ == '__main__':
     b_tf100 = tf.convert_to_tensor(b100, dtype=tf.float32)
     x0_tf100 = tf.convert_to_tensor(x100, dtype=tf.float32)
 
-    # # 1000 x 1000 Element Data
-    # data7 = sio.loadmat('./data/1000x1000/K_forceboundary_elements1000x1000.mat')
-    # data8 = sio.loadmat('./data/1000x1000/f_forceboundary_elements1000x1000.mat')
-    # data9 = sio.loadmat('./data/1000x1000/x0_elements1000x1000.mat')
-    # A1000 = data7['K_forceboundary_elements1000x1000']
-    # b1000 = data8['f_forceboundary_elements1000x1000']
-    # x1000 = data9['x0_elements100x1000']
-    # A_tensor = convert_sparse_matrix_to_sparse_tensor(A100)
-    # A_tf1000 = tf.cast(A_tensor, tf.float32)
-    # b_tf1000 = tf.convert_to_tensor(b1000, dtype=tf.float32)
-    # x0_tf1000 = tf.convert_to_tensor(x1000, dtype=tf.float32)
+    # 1000 x 1000 Element Data
+    data7 = sio.loadmat('./data/1000x1000/K_forceboundary_elements1000x1000.mat')
+    data8 = sio.loadmat('./data/1000x1000/f_forceboundary_elements1000x1000.mat')
+    data9 = sio.loadmat('./data/1000x1000/x0_elements1000x1000.mat')
+    A1000 = data7['K_forceboundary_elements1000x1000']
+    b1000 = data8['f_forceboundary_elements1000x1000']
+    x1000 = data9['x0_elements1000x1000']
+    A_tensor = convert_sparse_matrix_to_sparse_tensor(A1000)
+    A_tf1000 = tf.cast(A_tensor, tf.float32)
+    b_tf1000 = tf.convert_to_tensor(b1000, dtype=tf.float32)
+    x0_tf1000 = tf.convert_to_tensor(x1000, dtype=tf.float32)
 
 
     FLAGS = tf.app.flags.FLAGS
@@ -94,9 +94,9 @@ if __name__ == '__main__':
     end_tf100 = timer()
     print('Tensorflow solved for 100 element case in ', end_tf100 - start_tf100, ' Seconds.')
 
-    # # 1000 x 1000 Elements
-    # n1000 =   # Based on # of python iterations
-    # start_tf1000 = timer()
-    # x_result_tf1000 = conjgrad_tf(A_tf1000, b_tf1000, x0_tf1000, n1000)
-    # end_tf1000 = timer()
-    # print('Tensorflow solved for 1000 element case in ', end_tf1000 - start_tf1000, ' Seconds.')
+    # 1000 x 1000 Elements
+    n1000 =  2818 # Based on # of python iterations
+    start_tf1000 = timer()
+    x_result_tf1000 = conjgrad_tf(A_tf1000, b_tf1000, x0_tf1000, n1000)
+    end_tf1000 = timer()
+    print('Tensorflow solved for 1000 element case in ', end_tf1000 - start_tf1000, ' Seconds.')

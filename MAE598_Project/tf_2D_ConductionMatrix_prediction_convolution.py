@@ -71,17 +71,17 @@ if __name__ == '__main__':
     b10 = data2['f_forceboundary_elements10x10']
     x10 = data3['x0_elements10x10']
     b_tf10 = tf.convert_to_tensor(b10, dtype=tf.float32)
-    x0_tf10 = np.zeros((1,110,110,1), 'float32')
+    x0_tf10 = np.zeros((1,10,11,1), 'float32')
 
-    # 100 x 100 Element Data
-    data4 = sio.loadmat('./data/100x100/K_forceboundary_elements100x100.mat')
-    data5 = sio.loadmat('./data/100x100/f_forceboundary_elements100x100.mat')
-    data6 = sio.loadmat('./data/100x100/x0_elements100x100.mat')
-    A100 = data4['K_forceboundary_elements100x100']
-    b100 = data5['f_forceboundary_elements100x100']
-    x100 = data6['x0_elements100x100']
-    b_tf100 = tf.convert_to_tensor(b100, dtype=tf.float32)
-    x0_tf100 = np.zeros((1, 10100, 10100, 1), 'float32')
+    # # 100 x 100 Element Data
+    # data4 = sio.loadmat('./data/100x100/K_forceboundary_elements100x100.mat')
+    # data5 = sio.loadmat('./data/100x100/f_forceboundary_elements100x100.mat')
+    # data6 = sio.loadmat('./data/100x100/x0_elements100x100.mat')
+    # A100 = data4['K_forceboundary_elements100x100']
+    # b100 = data5['f_forceboundary_elements100x100']
+    # x100 = data6['x0_elements100x100']
+    # b_tf100 = tf.convert_to_tensor(b100, dtype=tf.float32)
+    # x0_tf100 = np.zeros((1, 10100, 10100, 1), 'float32')
 
     # # 1000 x 1000 Element Data
     # data7 = sio.loadmat('./data/1000x1000/K_forceboundary_elements1000x1000.mat')
@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
     # 10 x 10 Elements
     n10 = 36    # Based on # of python iterations
-    u = tf.placeholder(tf.float32,shape=(1, 110, 110, 1))
+    u = tf.placeholder(tf.float32,shape=(1, 10, 11, 1))
     x_result_tf10 = conjgrad_tf(A_weights, b_tf10, x0_tf10, n10)
 
     # optimizer
@@ -118,9 +118,9 @@ if __name__ == '__main__':
 
     u1 = spsolve(A10, b10)
     u_gt = u1
-    u_gt = u1.reshape(1, 110, 110, 1)
-    b10 = b10.reshape(1, 110, 110, 1)
-    f = tf.placeholder(tf.float32,shape=(1, 110, 110, 1))
+    u_gt = u1.reshape(1, 10, 11, 1)
+    b10 = b10.reshape(1, 10, 11, 1)
+    f = tf.placeholder(tf.float32,shape=(1, 10, 11, 1))
     batch_size = 1
     test_loss_hist = []
     train_loss_hist = []
