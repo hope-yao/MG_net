@@ -1,9 +1,4 @@
-import numpy as np
 import tensorflow as tf
-from ops import new_weight_variable, new_bias_variable
-import scipy.io as sio
-import matplotlib.pyplot as plt
-import seaborn as sns
 import scipy.io as sio
 import numpy as np
 
@@ -18,9 +13,6 @@ class Jacobi_block():
             self.response_dim = 1
             self.filter_size = 3
             self.A_weights = {}
-            # self.A_weights['LU_filter'] = new_weight_variable([self.filter_size, self.filter_size, self.input_dim, self.response_dim])
-            # self.A_weights['LU_bias'] = new_bias_variable([self.response_dim])
-            # self.A_weights['D_matrix'] = tf.Variable(np.ones((1, self.imsize, self.imsize, 1)), dtype=tf.float32, name='D_matrix')
 
             # NOTICE: right now for homogeneous anisotropic material only!!
             self.k = tf.Variable(1., tf.float32)
@@ -32,14 +24,11 @@ class Jacobi_block():
         else:
             assert 'not supported'
 
-    def LU_layers(self, input_tensor, LU_filter, LU_bias):
-        return tf.nn.conv2d(input=input_tensor, filter=LU_filter, strides=[1,1,1,1], padding='VALID')
-
     def apply(self, f, max_itr=10):
         result = {}
         u_input = np.zeros((1, 68, 68, 1), 'float32')  # where u is unknown
         result['u_hist'] = [u_input]
-        for itr in range(1500):
+        for itr in range(15):
             padded_input = tf.pad(u_input, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
             LU_u = tf.nn.conv2d(input=padded_input, filter=self.A_weights['LU_filter'], strides=[1, 1, 1, 1],padding='VALID')
             u = (f - LU_u[:, 1:-1, :]) / self.A_weights['D_matrix']
@@ -49,9 +38,6 @@ class Jacobi_block():
         return result
 
 if __name__ == "__main__":
-    from utils import creat_dir
-    from tqdm import tqdm
-
     cfg = {
             'batch_size': 1,
             'imsize': 64,
@@ -76,7 +62,7 @@ if __name__ == "__main__":
         allow_soft_placement=True,
         log_device_placement=True,
     )
-    tfconfig.gpu_options.allow_growth = True
+    #tfconfig.gpu_options.allow_growth = True
     sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
     sess.run(init)
@@ -92,7 +78,7 @@ if __name__ == "__main__":
     test_loss_hist = []
     train_loss_hist = []
     k_value_hist = []
-    for itr in tqdm(range(50000)):
+    for itr in range(50):
         for i in range(1):
             u_input = u_gt
             f_input = f1

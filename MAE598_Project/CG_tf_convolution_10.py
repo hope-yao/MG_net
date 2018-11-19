@@ -6,13 +6,6 @@ import tensorflow as tf
 def conjgrad_tf(A_weights, b, x, n):
     #r = b - A.dot(x)       # python method
     padded_x = tf.pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], "SYMMETRIC")
-
-        # original
-    # A_dotx_conv = tf.nn.conv2d(input=padded_x, filter=A_weights, strides=[1, 1, 1, 1], padding='VALID')
-    # r_c = b - A_dotx_conv
-    # r = r_c[0, 0, :, :]
-    # p = r_c
-
         # reshape
     A_dotx_conv = tf.nn.conv2d(input=padded_x, filter=A_weights, strides=[1, 1, 1, 1], padding='VALID')
 
@@ -56,29 +49,6 @@ if __name__ == '__main__':
     x0_tf10 = np.zeros((1,110,1,1), 'float32')
     x0_tf10 = np.reshape(x0_tf10, (1, 10, 11, 1))
 
-    # 100 x 100 Element Data
-    data4 = sio.loadmat('./data/100x100/K_forceboundary_elements100x100.mat')
-    data5 = sio.loadmat('./data/100x100/f_forceboundary_elements100x100.mat')
-    data6 = sio.loadmat('./data/100x100/x0_elements100x100.mat')
-    A100 = data4['K_forceboundary_elements100x100']
-    b100 = data5['f_forceboundary_elements100x100']
-    x100 = data6['x0_elements100x100']
-    b_tf100 = tf.convert_to_tensor(b100, dtype=tf.float32)
-    x0_tf100 = np.zeros((1, 10100, 1, 1), 'float32')
-    x0_tf100 = np.reshape(x0_tf100, (1, 100, 101, 1))
-
-    # 1000 x 1000 Element Data
-    data7 = sio.loadmat('./data/1000x1000/K_forceboundary_elements1000x1000.mat')
-    data8 = sio.loadmat('./data/1000x1000/f_forceboundary_elements1000x1000.mat')
-    data9 = sio.loadmat('./data/1000x1000/x0_elements1000x1000.mat')
-    A1000 = data7['K_forceboundary_elements1000x1000']
-    b1000 = data8['f_forceboundary_elements1000x1000']
-    x1000 = data9['x0_elements1000x1000']
-    b_tf1000 = tf.convert_to_tensor(b1000, dtype=tf.float32)
-    x0_tf1000 = np.zeros((1, 1001000, 1, 1), 'float32')
-    x0_tf1000 = np.reshape(x0_tf1000, (1, 1000, 1001, 1))
-
-
     FLAGS = tf.app.flags.FLAGS
     tfconfig = tf.ConfigProto(
         allow_soft_placement=True,
@@ -95,28 +65,3 @@ if __name__ == '__main__':
     x_result_tf10 = conjgrad_tf(A_weights, b_tf10, x0_tf10, n10)
     end_tf10 = timer()
     print('Tensorflow solved for 10 element case in ', end_tf10 - start_tf10, ' Seconds.')
-
-    # 100 x 100 Elements
-    n100 = 313  # Based on # of python iterations
-    start_tf100 = timer()
-    x_result_tf100 = conjgrad_tf(A_weights, b_tf100, x0_tf100, n100)
-    end_tf100 = timer()
-    print('Tensorflow solved for 100 element case in ', end_tf100 - start_tf100, ' Seconds.')
-
-    # 1000 x 1000 Elements
-    n1000 = 2818  # Based on # of python iterations
-    start_tf1000 = timer()
-    x_result_tf1000 = conjgrad_tf(A_weights, b_tf1000, x0_tf1000, n1000)
-    end_tf1000 = timer()
-    print('Tensorflow solved for 1000 element case in ', end_tf1000 - start_tf1000, ' Seconds.')
-
-    # with tf.Session(config=tfconfig) as sess:
-    #     sess.run(init)
-    #
-    #     start_tf = timer()
-    #
-    #     sess.run(conjgrad_tf(A_weights, b_tf, x0_tf))
-    #
-    #     end_tf = timer()
-    #     print('Tensorflow solved in ',  end_tf - start_tf, ' Seconds.')
-

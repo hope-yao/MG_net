@@ -26,25 +26,6 @@ def conjgrad_tf(A_tf, b, x, n):
     result['final'] = x
     return result
 
-# def conjgrad_py(A, b, tol, x, n):
-#     result = {}
-#     r = b - A.dot(x)
-#     p = r
-#     rsold = np.dot(r.T, r)
-#     for i in range(n):
-#         Ap = A.dot(p)
-#         alpha = rsold / np.dot(p.T, Ap)
-#         x = x + alpha * p
-#         r = r - alpha * Ap
-#         rsnew = np.dot(r.T, r)
-#         if np.sqrt(rsnew) < tol:
-#             print('Itr:', i)
-#             break
-#         p = r + (rsnew / rsold) * p
-#         rsold = rsnew
-#     result['final'] = x
-#     return result
-
 def convert_sparse_matrix_to_sparse_tensor(X):
     coo = X.tocoo()
     indices = np.mat([coo.row, coo.col]).transpose()
