@@ -46,8 +46,8 @@ if __name__ == '__main__':
     filter = np.asarray([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
     A_weights = np.reshape(filter, (3, 3, 1, 1))* conductivity
     n = 36
-    b = tf.placeholder(tf.float32, shape=(110, 1))
-    x = tf.placeholder(tf.float32, shape=(110, 1))
+    b = tf.placeholder(tf.float32, shape=(110, 1), name="b")
+    x = tf.placeholder(tf.float32, shape=(110, 1), name="x")
     x = tf.reshape(x, (1, 10, 11, 1))
     CGpy_result = conjgrad_tf(A_weights, b, x, n)
     x = tf.reshape(x,(110, 1))
@@ -78,7 +78,8 @@ if __name__ == '__main__':
     b10 = data2['f_forceboundary_elements10x10']
     x10 = spsolve(A10, b10)
     x_gt = x10.reshape(110, 1)
-    # b10 = b10.reshape(1, 10, 11, 1)
+    b10 = np.float32(b10)
+    x_gt = np.float32(x_gt)
     test_loss_hist = []
     train_loss_hist = []
     k_value_hist = []
