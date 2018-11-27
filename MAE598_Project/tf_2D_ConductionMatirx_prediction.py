@@ -76,16 +76,16 @@ if __name__ == '__main__':
     data3 = sio.loadmat('./data/10x10/x0_elements10x10.mat')
     A10 = data1['K_forceboundary_elements10x10']
     b10 = data2['f_forceboundary_elements10x10']
-    x10 = spsolve(A10, b10)
-    x_gt = x10.reshape(110, 1)
+    x = spsolve(A10, b10)
+    x = x.reshape(110, 1)
     b10 = np.float32(b10)
-    x_gt = np.float32(x_gt)
+    x = np.float32(x)
     test_loss_hist = []
     train_loss_hist = []
     k_value_hist = []
     for itr in range(500):
         for i in range(1):
-            x_input = x_gt
+            x_input = x
             b_input = b10
             feed_dict_train = {b: b_input, x: x_input}
             _, loss_value, k_value = sess.run([train_op, loss, conductivity], feed_dict_train)
