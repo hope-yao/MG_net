@@ -64,4 +64,4 @@ if __name__ == '__main__':
     start_tf1000 = timer()
     x_result_tf1000 = conjgrad_tf(A_weights, b_tf1000, x0_tf1000, n1000)
     end_tf1000 = timer()
-    print('Tensorflow solved for 10 element case in ', end_tf1000 - start_tf1000, ' Seconds.')
+    print('Tensorflow solved for 1000 element case in ', end_tf1000 - start_tf1000, ' Seconds.')

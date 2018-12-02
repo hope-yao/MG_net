@@ -68,7 +68,6 @@ if __name__ == '__main__':
     x10 = spsolve(A10, b10)
     x_gt = x10.reshape(1, 10, 11, 1)
     b10 = b10.reshape(1, 10, 11, 1)
-    batch_size['batch_size'] = 1
     test_loss_hist = []
     train_loss_hist = []
     k_value_hist = []
