@@ -119,3 +119,4 @@ if __name__ == '__main__':
             print("iter:{}  train_cost: {}  k_value: {}".format(itr, np.mean(loss_value), k_value))
 
     print('done')
+
