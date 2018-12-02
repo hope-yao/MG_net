@@ -2,6 +2,9 @@ import numpy as np
 import scipy.io as sio
 from timeit import default_timer as timer
 import tensorflow as tf
+import os
+os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"       # set to -1 to enable CPU, set to 0 to enable GPU
 
 def convert_sparse_matrix_to_sparse_tensor(X):
     coo = X.tocoo()
@@ -75,7 +78,7 @@ if __name__ == '__main__':
         allow_soft_placement=True,
         log_device_placement=True,
     )
-    #tfconfig.gpu_options.allow_growth = True
+    tfconfig.gpu_options.allow_growth = True
     sess = tf.Session(config=tfconfig)
     init = tf.global_variables_initializer()
     sess.run(init)
