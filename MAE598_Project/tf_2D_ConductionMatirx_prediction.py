@@ -47,10 +47,10 @@ if __name__ == '__main__':
     A_weights = np.reshape(filter, (3, 3, 1, 1))* conductivity
     n = 36
     b = tf.placeholder(tf.float32, shape=(110, 1), name="b")
-    x = tf.placeholder(tf.float32, shape=(110, 1), name="x")
-    x = tf.reshape(x, (1, 10, 11, 1))
+    x_input_pl = tf.placeholder(tf.float32, shape=(110, 1), name="x")
+    x = tf.reshape(x_input_pl, (1, 10, 11, 1))
     CGpy_result = conjgrad_tf(A_weights, b, x, n)
-    x = tf.reshape(x,(110, 1))
+    x = tf.reshape(x, (110, 1))
     # optimizer
     CGpy_result['loss'] = loss = tf.reduce_mean(tf.abs(CGpy_result['final'] - x))
     lr = 1
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         for i in range(1):
             x_input = x
             b_input = b10
-            feed_dict_train = {b: b_input, x: x_input}
+            feed_dict_train = {b: b_input, x_input_pl: x_input}
             _, loss_value, k_value = sess.run([train_op, loss, conductivity], feed_dict_train)
 
             print("iter:{}  train_cost: {}  k_value: {}".format(itr, np.mean(loss_value), k_value))
