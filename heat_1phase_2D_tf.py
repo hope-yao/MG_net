@@ -78,7 +78,7 @@ if __name__ == "__main__":
     test_loss_hist = []
     train_loss_hist = []
     k_value_hist = []
-    for itr in range(50):
+    for itr in range(5000):
         for i in range(1):
             u_input = u_gt
             f_input = f1
